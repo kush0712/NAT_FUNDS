@@ -1,0 +1,15 @@
+node_modules/
+.DS_Store
+server.log
+output*.txt
+cache/
+.stitch/
+
+# Optional: If you don't want to upload your large JSON databases to GitHub, uncomment these:
+# aum-data.json
+# benchmark-data.json
+# ir-data.json
+# riskometer-data.json
+# ter-data.json
+# tri-data.json
+# aum_data/

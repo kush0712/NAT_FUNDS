@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>NAT funds | Institutional Grade Fund Discovery</title>
+  <meta name="description" content="Discover, filter, and compare Indian mutual funds with institutional-grade analytics. End-of-day NAV data from AMFI." />
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <link href="/styles.css" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "background": "#f8f9fa",
+            "error": "#ba1a1a",
+            "error-container": "#ffdad6",
+            "inverse-on-surface": "#f0f1f2",
+            "inverse-primary": "#bdc2ff",
+            "inverse-surface": "#2e3132",
+            "on-background": "#191c1d",
+            "on-error": "#ffffff",
+            "on-error-container": "#93000a",
+            "on-primary": "#ffffff",
+            "on-primary-container": "#747cd3",
+            "on-primary-fixed": "#010766",
+            "on-primary-fixed-variant": "#353e91",
+            "on-secondary": "#ffffff",
+            "on-secondary-container": "#207128",
+            "on-secondary-fixed": "#002204",
+            "on-secondary-fixed-variant": "#005312",
+            "on-surface": "#191c1d",
+            "on-surface-variant": "#464651",
+            "on-tertiary": "#ffffff",
+            "on-tertiary-container": "#cb6657",
+            "on-tertiary-fixed": "#410000",
+            "on-tertiary-fixed-variant": "#7d2b21",
+            "outline": "#767683",
+            "outline-variant": "#c6c5d3",
+            "primary": "#4f46e5",
+            "primary-container": "#312e81",
+            "primary-fixed": "#e0e0ff",
+            "primary-fixed-dim": "#bdc2ff",
+            "secondary": "#1b6d24",
+            "secondary-container": "#a0f499",
+            "secondary-fixed": "#a3f69c",
+            "secondary-fixed-dim": "#87d982",
+            "surface": "#f8f9fa",
+            "surface-bright": "#f8f9fa",
+            "surface-container": "#edeeef",
+            "surface-container-high": "#e7e8e9",
+            "surface-container-highest": "#e1e3e4",
+            "surface-container-low": "#f3f4f5",
+            "surface-container-lowest": "#ffffff",
+            "surface-dim": "#d9dadb",
+            "surface-tint": "#4e56ab",
+            "surface-variant": "#e1e3e4",
+            "tertiary": "#000000"
+          },
+          fontFamily: {
+            "headline": ["Manrope", "sans-serif"],
+            "body": ["Inter", "sans-serif"],
+            "label": ["Inter", "sans-serif"]
+          },
+          borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem", "2xl": "1rem", "3xl": "1.5rem" },
+        },
+      },
+    }
+  </script>
+</head>
+<body class="bg-[#f8f9fc] font-body text-on-surface min-h-screen flex flex-col relative">
+
+  <!-- Background Decorative Glow -->
+  <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+    <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-500/10 blur-[120px]"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-blue-500/10 blur-[120px]"></div>
+  </div>
+
+  <!-- Top Navigation Bar -->
+  <header id="topnav" class="flex justify-between items-center w-full px-8 py-5 sticky top-0 z-[100] backdrop-blur-2xl bg-white/70 shadow-[0px_4px_30px_rgba(79,70,229,0.1)] border-b border-indigo-200/30">
+    <div class="flex items-center gap-8">
+      <a href="#/" class="text-2xl font-extrabold tracking-tight text-primary font-headline cursor-pointer drop-shadow-sm">NAT funds</a>
+      <nav class="hidden md:flex items-center gap-6">
+        <a id="nav-dashboard" class="nav-link text-sm font-medium transition-colors" href="#/">Dashboard</a>
+        <a id="nav-explore" class="nav-link text-sm font-medium transition-colors" href="#/explore">Explore Funds</a>
+        <a id="nav-compare" class="nav-link text-sm font-medium transition-colors" href="#/compare">Compare</a>
+      </nav>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="relative hidden lg:block" id="search-container">
+        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary text-sm">search</span>
+        <input id="global-search" class="pl-10 pr-4 py-2.5 bg-surface-container-high rounded-t-md rounded-b-none border-b-2 border-transparent focus:border-primary focus:bg-surface-variant transition-all outline-none text-sm w-64" placeholder="Search mutual funds..." type="text" autocomplete="off" />
+        <div id="search-results" class="search-dropdown hidden"></div>
+      </div>
+      <!-- Plan Type Toggle -->
+      <div class="plan-toggle hidden md:inline-flex">
+        <button id="toggle-direct" class="active" onclick="setPlanType('Direct')">Direct</button>
+        <button id="toggle-regular" onclick="setPlanType('Regular')">Regular</button>
+      </div>
+      <div class="plan-toggle hidden md:inline-flex">
+        <button id="toggle-growth" class="active" onclick="setOptionType('Growth')">Growth</button>
+        <button id="toggle-idcw" onclick="setOptionType('IDCW')">IDCW</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed left-0 top-[73px] h-[calc(100vh-73px)] w-64 bg-slate-100 flex-col pt-6 border-r border-slate-200/50 hidden lg:flex overflow-y-auto z-40">
+      <div class="px-6 mb-6">
+        <h3 class="text-primary font-headline font-bold text-xs tracking-widest uppercase">Fund Categories</h3>
+        <p class="text-on-surface-variant text-[11px] font-medium opacity-70">Select a category to explore</p>
+      </div>
+      <nav id="sidebar-nav" class="flex-1 space-y-1">
+        <!-- Populated by JS -->
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main id="main-content" class="flex-1 lg:ml-64 overflow-y-auto bg-surface min-h-screen">
+
+      <!-- Loading Screen -->
+      <div id="loading-screen" class="flex flex-col items-center justify-center min-h-[60vh] p-8">
+        <div class="spinner mb-6"></div>
+        <h2 class="font-headline text-xl font-bold text-primary mb-2">Loading Fund Data</h2>
+        <p id="loading-message" class="text-on-surface-variant text-sm text-center max-w-md">Fetching end-of-day NAV data from AMFI...</p>
+        <div id="loading-bar" class="w-64 h-1.5 bg-surface-container-high rounded-full mt-4 overflow-hidden">
+          <div id="loading-bar-fill" class="h-full bg-primary rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- View: Home / Dashboard -->
+      <div id="view-home" class="hidden p-8 view-enter">
+        <!-- Hero -->
+        <section class="mb-12 relative z-10">
+          <div class="relative rounded-[2.5rem] overflow-hidden bg-gradient-to-br from-primary via-indigo-600 to-indigo-900 p-12 md:p-16 lg:p-20 text-on-primary shadow-[0px_30px_60px_rgba(79,70,229,0.3)] flex items-center border border-indigo-400/20">
+            <div class="relative z-10 max-w-2xl">
+              <h1 class="text-4xl md:text-5xl lg:text-6xl font-[800] font-headline leading-tight tracking-tight mb-6 drop-shadow-md">Master Your Capital with Precision.</h1>
+              <p class="text-indigo-100 text-lg md:text-xl font-medium mb-10 opacity-95 leading-relaxed font-body drop-shadow-sm">Discover institutional-grade Indian mutual funds curated for long-term growth and stability. Precision tools for the modern investor.</p>
+              <div class="flex flex-wrap gap-4">
+                <a href="#/explore" class="bg-gradient-to-r from-emerald-500 to-emerald-600 border border-white/20 shadow-lg text-white font-extrabold px-8 py-4 rounded-xl hover:shadow-[0px_10px_20px_rgba(16,185,129,0.4)] hover:-translate-y-1 transition-all flex items-center gap-2 tracking-wide">
+                        Explore All Funds
+                        <span class="material-symbols-outlined text-lg font-bold">arrow_forward</span>
+                </a>
+              </div>
+            </div>
+            <div class="absolute right-0 top-0 w-1/2 h-full opacity-30 pointer-events-none">
+              <div class="absolute inset-0 bg-gradient-to-l from-secondary/40 to-transparent"></div>
+              <div class="w-full h-full flex items-center justify-center">
+                <span class="material-symbols-outlined text-white" style="font-size: 200px; opacity: 0.3">analytics</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Data Disclaimer -->
+        <div class="mb-8 p-4 rounded-2xl bg-surface-container-low border-l-4 border-on-primary-container/30 flex items-start gap-4 shadow-[0px_4px_12px_rgba(0,0,0,0.02)]">
+          <span class="material-symbols-outlined text-on-primary-container mt-0.5" data-icon="info">info</span>
+          <div>
+            <p class="text-sm text-on-surface-variant font-medium leading-relaxed">
+              <strong>Data Source:</strong> NAV data is sourced from AMFI India and updated at end-of-day (not real-time intra-day). 
+              All metrics are calculated from historical NAV data. AUM and TER are available for select funds only. 
+              Past performance does not guarantee future returns.
+            </p>
+          </div>
+        </div>
+
+        <!-- Category Bento Cards -->
+        <section class="mb-16">
+          <div class="mb-6">
+            <h2 class="text-xl font-headline font-bold text-on-surface">Asset Categories</h2>
+            <p class="text-on-surface-variant text-sm">Select a category to view deep analytics and performance history.</p>
+          </div>
+          <div id="category-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- Populated by JS -->
+          </div>
+        </section>
+
+        <!-- Featured Funds -->
+        <section class="mb-16">
+          <div class="flex justify-between items-center mb-8">
+            <div>
+              <h2 class="text-xl font-headline font-bold text-on-surface">Top Performing Funds</h2>
+              <p class="text-on-surface-variant text-sm">Best within each category by 3Y CAGR. Not a recommendation.</p>
+            </div>
+          </div>
+          <div id="featured-funds" class="bg-surface-container-lowest rounded-xl overflow-hidden">
+            <!-- Populated by JS -->
+          </div>
+        </section>
+      </div>
+
+      <!-- View: Category Deep Dive -->
+      <div id="view-explore" class="hidden p-8 view-enter">
+        <div class="mb-10">
+          <div id="explore-breadcrumb" class="flex items-center gap-2 text-on-surface-variant text-sm mb-4"></div>
+          <h1 id="explore-title" class="font-headline text-3xl font-extrabold text-on-surface tracking-tight"></h1>
+          <p id="explore-subtitle" class="text-on-surface-variant mt-2 max-w-2xl"></p>
+        </div>
+
+        <div class="grid grid-cols-12 gap-8 items-start">
+          <!-- Filters sidebar -->
+          <div class="col-span-12 lg:col-span-3 space-y-6 lg:sticky lg:top-24">
+            <!-- Market Cap Quick Filter (Equity only) -->
+            <div id="marketcap-filter-section" class="hidden bg-surface/60 backdrop-blur-xl border border-white rounded-[1.25rem] p-6 shadow-[0px_4px_20px_rgba(0,6,102,0.03)] relative overflow-hidden">
+              <div class="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none"></div>
+              <h4 class="font-headline text-sm font-bold text-primary mb-4 flex items-center gap-2 relative z-10">
+                <span class="material-symbols-outlined text-lg">donut_large</span>
+                MARKET CAP
+                <span class="tooltip-trigger relative cursor-help">
+                  <span class="material-symbols-outlined text-xs text-outline">info</span>
+                  <span class="glass-tooltip">Filter by company size: Large Cap (top 100 companies), Mid Cap (101-250), Small Cap (251+). Larger caps are generally less risky.</span>
+                </span>
+              </h4>
+              <div id="marketcap-buttons" class="flex flex-wrap gap-2">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+
+            <!-- Sub-category filters -->
+            <div class="bg-surface/60 backdrop-blur-xl border border-white rounded-[1.25rem] p-6 shadow-[0px_4px_20px_rgba(0,6,102,0.03)] relative overflow-hidden">
+              <div class="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none"></div>
+              <h4 class="font-headline text-sm font-bold text-primary mb-6 flex items-center gap-2 relative z-10">
+                <span class="material-symbols-outlined text-lg">filter_alt</span>
+                SUB-CATEGORIES
+              </h4>
+              <div id="subcategory-filters" class="space-y-3">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Fund Table -->
+          <div class="col-span-12 lg:col-span-9 relative z-10">
+            <div class="bg-white/80 backdrop-blur-md rounded-[1.5rem] shadow-[0px_20px_50px_rgba(31,41,55,0.06)] overflow-hidden border border-white">
+              <div class="p-6 border-b border-outline-variant/15 flex justify-between items-center bg-surface-bright">
+                <div class="flex items-center gap-4">
+                  <span id="table-title" class="text-lg font-bold text-on-surface"></span>
+                  <span class="px-2 py-0.5 bg-surface-container-high text-on-surface-variant text-[10px] font-bold rounded flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 bg-secondary rounded-full"></span>
+                    END-OF-DAY NAV
+                  </span>
+                </div>
+                <div id="compare-action" class="hidden">
+                  <button onclick="goToCompare()" class="px-4 py-2 bg-primary text-white rounded-lg text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">compare_arrows</span>
+                    Compare Selected (<span id="compare-count">0</span>)
+                  </button>
+                </div>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse" id="fund-table">
+                  <thead>
+                    <tr class="bg-surface-container-low/50">
+                      <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant w-12">
+                        <span class="tooltip-trigger relative cursor-help">
+                          ✓
+                          <span class="glass-tooltip" style="width:10rem">Select funds to compare side-by-side</span>
+                        </span>
+                      </th>
+                      <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant sortable" data-sort="schemeName">Fund Name</th>
+                      <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-right sortable" data-sort="nav">NAV</th>
+                      <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-right th-tooltip">
+                        <span class="tooltip-trigger relative cursor-help sortable" data-sort="aum">
+                          AUM
+                          <span class="material-symbols-outlined text-xs ml-0.5 align-middle">info</span>
+                          <span class="glass-tooltip">Total money managed by this fund (₹ Crores). Larger AUM = more investor trust.</span>
+                        </span>
+                      </th>
+                      <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-right th-tooltip">
+                        <span class="tooltip-trigger relative cursor-help sortable" data-sort="cagr1y">
+                          CAGR 1Y
+                          <span class="material-symbols-outlined text-xs ml-0.5 align-middle">info</span>
+                          <span class="glass-tooltip">How much your ₹100 would have grown in 1 year, expressed as annual %.</span>
+                        </span>
+                      </th>
+                      <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-right th-tooltip">
+                        <span class="tooltip-trigger relative cursor-help sortable" data-sort="cagr3y">
+                          CAGR 3Y
+                          <span class="material-symbols-outlined text-xs ml-0.5 align-middle">info</span>
+                          <span class="glass-tooltip">Average yearly growth rate over the last 3 years — shows medium-term consistency.</span>
+                        </span>
+                      </th>
+                      <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-right th-tooltip">
+                        <span class="tooltip-trigger relative cursor-help sortable" data-sort="cagr5y">
+                          CAGR 5Y
+                          <span class="material-symbols-outlined text-xs ml-0.5 align-middle">info</span>
+                          <span class="glass-tooltip">Average yearly growth rate over the last 5 years — longer period, more reliable indicator.</span>
+                        </span>
+                      </th>
+                      <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-right th-tooltip">
+                        <span class="tooltip-trigger relative cursor-help sortable" data-sort="sharpeRatio">
+                          Sharpe
+                          <span class="material-symbols-outlined text-xs ml-0.5 align-middle">info</span>
+                          <span class="glass-tooltip">Reward per unit of risk. Higher = better. Above 1.0 is good, above 2.0 is excellent.</span>
+                        </span>
+                      </th>
+                      <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-right th-tooltip">
+                        <span class="tooltip-trigger relative cursor-help sortable" data-sort="standardDeviation">
+                          Std Dev
+                          <span class="material-symbols-outlined text-xs ml-0.5 align-middle">info</span>
+                          <span class="glass-tooltip">How much returns swing up & down. Lower = more predictable. Think of it as volatility.</span>
+                        </span>
+                      </th>
+                      <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-right th-tooltip hidden xl:table-cell">
+                        <span class="tooltip-trigger relative cursor-help sortable" data-sort="beta">
+                          Beta
+                          <span class="material-symbols-outlined text-xs ml-0.5 align-middle">info</span>
+                          <span class="glass-tooltip">Sensitivity to market. Beta=1 means moves with market. &lt;1 is less risky, &gt;1 is more volatile.</span>
+                        </span>
+                      </th>
+                      <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-right th-tooltip">
+                        <span class="tooltip-trigger relative cursor-help sortable" data-sort="consistencyScore">
+                          Score
+                          <span class="material-symbols-outlined text-xs ml-0.5 align-middle">info</span>
+                          <span class="glass-tooltip" style="width:14rem">Composite quality score 1–10 within category. Aggregates rolling returns, downside protection, Sortino &amp; cost-efficiency.</span>
+                        </span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody id="fund-table-body">
+                    <!-- Populated by JS -->
+                  </tbody>
+                </table>
+              </div>
+              <div id="table-pagination" class="p-6 bg-surface-container-low/30 flex justify-between items-center">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- View: Fund Detail -->
+      <div id="view-fund" class="hidden p-8 view-enter">
+        <div id="fund-detail-content">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- View: Compare -->
+      <div id="view-compare" class="hidden p-8 view-enter">
+        <header class="mb-12">
+          <h1 class="font-headline text-3xl font-extrabold text-primary mb-2 tracking-tight">Advanced Fund Comparison</h1>
+          <p class="text-on-surface-variant max-w-2xl">Analyze risk-adjusted metrics side-by-side. Compare within the same category for meaningful results.</p>
+        </header>
+        <div id="compare-warning" class="hidden mb-6 p-4 rounded-xl bg-tertiary-fixed text-tertiary text-sm font-medium"></div>
+        <div id="compare-content" class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <!-- Populated by JS -->
+        </div>
+        <!-- Rolling Return Chart Container -->
+        <div id="rolling-return-chart-section" class="hidden mt-10">
+          <h2 class="text-xl font-headline font-bold text-on-surface mb-6 flex items-center gap-2">
+            Rolling Return Distribution
+            <span class="tooltip-trigger relative cursor-help">
+              <span class="material-symbols-outlined text-lg text-outline">info</span>
+              <span class="glass-tooltip">Shows the range (min, avg, max) of returns across all possible 1-year and 3-year windows. Wider range = less consistent returns.</span>
+            </span>
+          </h2>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+              <h3 class="text-sm font-bold text-on-surface-variant uppercase tracking-widest mb-4">1-Year Rolling Returns</h3>
+              <div class="h-[280px]"><canvas id="rolling-chart-1y"></canvas></div>
+            </div>
+            <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+              <h3 class="text-sm font-bold text-on-surface-variant uppercase tracking-widest mb-4">3-Year Rolling Returns</h3>
+              <div class="h-[280px]"><canvas id="rolling-chart-3y"></canvas></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer class="w-full px-8 py-6 mt-auto flex flex-col items-center text-center gap-4 bg-slate-50 border-t border-slate-200/50">
+    <div class="flex flex-wrap justify-center gap-6">
+      <a class="text-slate-500 text-[11px] font-medium hover:text-indigo-800 transition-colors" href="#">Disclosures</a>
+      <a class="text-slate-500 text-[11px] font-medium hover:text-indigo-800 transition-colors" href="#">Privacy Policy</a>
+      <a class="text-slate-500 text-[11px] font-medium hover:text-indigo-800 transition-colors" href="#">Terms of Service</a>
+      <a class="text-slate-500 text-[11px] font-medium hover:text-indigo-800 transition-colors" href="#">SEBI Score</a>
+    </div>
+    <div class="max-w-2xl">
+      <p class="text-slate-500 text-[11px] leading-relaxed">
+        © 2024 NAT funds Research. Data sourced from AMFI India (end-of-day NAV, not real-time intra-day). Mutual fund investments are subject to market risks. Read all scheme related documents carefully before investing. Past performance is not indicative of future returns. This tool does not constitute investment advice.
+      </p>
+    </div>
+    <span class="text-sm font-bold text-slate-700 font-headline">NAT funds</span>
+  </footer>
+
+  <!-- Compare floating bar -->
+  <div id="compare-bar" class="compare-bar">
+    <div class="bg-primary text-white px-8 py-3 flex items-center justify-between shadow-2xl">
+      <div class="flex items-center gap-4">
+        <span class="material-symbols-outlined">compare_arrows</span>
+        <span id="compare-bar-text" class="text-sm font-medium">0 funds selected</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <button onclick="clearCompare()" class="px-4 py-1.5 text-xs font-bold rounded-lg border border-white/30 hover:bg-white/10 transition-colors">Clear</button>
+        <button onclick="goToCompare()" class="px-4 py-1.5 text-xs font-bold rounded-lg bg-white text-primary hover:opacity-90 transition-opacity">Compare Now</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
