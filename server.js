@@ -15,7 +15,7 @@ const { initTRI, syncTRI, getTRIHistory, getTRICount, classifyBenchmark, setTRIB
 const { initRiskFreeRate, getRiskFreeRateMeta } = require('./services/riskFreeRate');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 // In-memory data store
 let allFunds = [];
