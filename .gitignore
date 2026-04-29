@@ -4,6 +4,9 @@ server.log
 output*.txt
 cache/
 .stitch/
+mcp_config.json
+.env
+
 
 # Optional: If you don't want to upload your large JSON databases to GitHub, uncomment these:
 # aum-data.json

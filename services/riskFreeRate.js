@@ -1,5 +1,6 @@
 /**
- * riskFreeRate.js
+
+const logger = require('../shared/logger'); * riskFreeRate.js
  * Fetches the current 91-day Treasury Bill yield from RBI's public data API.
  * Used as the risk-free rate for Sharpe Ratio calculations.
  *
@@ -51,7 +52,7 @@ function saveToDisk(rate, timestamp) {
     ensureCacheDir();
     fs.writeFileSync(CACHE_FILE, JSON.stringify({ rate, timestamp: timestamp.toISOString() }), 'utf8');
   } catch (err) {
-    console.warn('[RiskFreeRate] Could not save cache to disk:', err.message);
+    logger.warn('[RiskFreeRate] Could not save cache to disk:', err.message);
   }
 }
 
@@ -104,11 +105,11 @@ async function fetchLiveRate() {
 
   for (const url of YIELD_URLS) {
     try {
-      console.log(`[RiskFreeRate] Fetching from: ${url}`);
+      logger.info(`[RiskFreeRate] Fetching from: ${url}`);
       const body = await httpsGet(url);
       const rate = parseRateFromHTML(body);
       if (rate !== null) {
-        console.log(`[RiskFreeRate] Fetched 91-day T-bill rate: ${(rate * 100).toFixed(4)}% from ${url}`);
+        logger.info(`[RiskFreeRate] Fetched 91-day T-bill rate: ${(rate * 100).toFixed(4)}% from ${url}`);
         return rate;
       }
       errors.push(`${url}: unparseable response`);
@@ -135,7 +136,7 @@ async function initRiskFreeRate() {
   if (disk) {
     _cachedRate = disk.rate;
     _cacheTimestamp = disk.timestamp;
-    console.log(`[RiskFreeRate] Loaded from disk: ${(_cachedRate * 100).toFixed(4)}% (cached ${disk.timestamp.toISOString()})`);
+    logger.info(`[RiskFreeRate] Loaded from disk: ${(_cachedRate * 100).toFixed(4)}% (cached ${disk.timestamp.toISOString()})`);
   }
 
   await refreshRateIfStale();
@@ -143,7 +144,7 @@ async function initRiskFreeRate() {
   // Schedule weekly background refresh
   setInterval(() => {
     refreshRateIfStale().catch(err =>
-      console.warn('[RiskFreeRate] Background refresh failed:', err.message)
+      logger.warn('[RiskFreeRate] Background refresh failed:', err.message)
     );
   }, CACHE_TTL_MS);
 }
@@ -156,7 +157,7 @@ async function refreshRateIfStale() {
   const isStale = !_cacheTimestamp || (now - _cacheTimestamp) > CACHE_TTL_MS;
 
   if (!isStale) {
-    console.log('[RiskFreeRate] Cache is fresh, skipping fetch.');
+    logger.info('[RiskFreeRate] Cache is fresh, skipping fetch.');
     return;
   }
 
@@ -165,14 +166,14 @@ async function refreshRateIfStale() {
     _cachedRate = rate;
     _cacheTimestamp = now;
     saveToDisk(rate, now);
-    console.log(`[RiskFreeRate] Updated rate to ${(rate * 100).toFixed(4)}%`);
+    logger.info(`[RiskFreeRate] Updated rate to ${(rate * 100).toFixed(4)}%`);
   } catch (err) {
     if (_cachedRate !== null) {
-      console.warn(`[RiskFreeRate] Fetch failed — using last valid rate ${(_cachedRate * 100).toFixed(4)}%: ${err.message}`);
+      logger.warn(`[RiskFreeRate] Fetch failed — using last valid rate ${(_cachedRate * 100).toFixed(4)}%: ${err.message}`);
     } else {
       // No cached rate at all — this is a fatal situation, but we log it and
       // let the caller decide. getRiskFreeRate() will throw in this case.
-      console.error('[RiskFreeRate] Fetch failed and no cached rate available:', err.message);
+      logger.error('[RiskFreeRate] Fetch failed and no cached rate available:', err.message);
     }
   }
 }

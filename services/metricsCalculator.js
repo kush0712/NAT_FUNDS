@@ -1,5 +1,6 @@
 /**
- * Metrics Calculator
+
+const logger = require('../shared/logger'); * Metrics Calculator
  * Pure functions for calculating financial metrics from NAV history.
  *
  * Methodological standards (all fixes applied):
@@ -149,10 +150,23 @@ function calculateCAGRs(navHistory) {
   if (res3y && res3y.gapDays >= 1) cagrDataQuality['3y'] = { gapDays: Math.round(res3y.gapDays * 10) / 10, usedDate: res3y.usedDate.toISOString().split('T')[0] };
   if (res5y && res5y.gapDays >= 1) cagrDataQuality['5y'] = { gapDays: Math.round(res5y.gapDays * 10) / 10, usedDate: res5y.usedDate.toISOString().split('T')[0] };
 
+  // Since-inception CAGR — always computable as long as fund has ≥ 1 month of history.
+  // Formula: (currentNAV / firstNAV)^(1/yearsActive) − 1
+  // This is the most honest return figure for young funds (Tickertape shows this too).
+  const firstNav      = parsed[0].nav;
+  const yearsActive   = (currentDate - oldestDate) / (365.25 * 24 * 60 * 60 * 1000);
+  const cagrSinceInception = (yearsActive >= 1/12 && firstNav > 0)
+    ? Math.round((Math.pow(currentNav / firstNav, 1 / yearsActive) - 1) * 10000) / 100
+    : null;
+  // Fund age in months — used by UI to show data-coverage banners.
+  const fundAgeMonths = Math.floor(yearsActive * 12);
+
   return {
     cagr1y: res1y ? calculateCAGR(res1y.nav, currentNav, 1) : null,
     cagr3y: res3y ? calculateCAGR(res3y.nav, currentNav, 3) : null,
     cagr5y: res5y ? calculateCAGR(res5y.nav, currentNav, 5) : null,
+    cagrSinceInception,  // annualised CAGR from inception — always shown
+    fundAgeMonths,       // UI: show data-coverage banner for young funds
     cagrDataQuality, // {} if all exact; populated keys indicate date-gap adjustments
   };
 }
@@ -369,7 +383,7 @@ function calculateRollingReturns(navHistory, windowYears = 1, benchmarkNavHistor
   if (returns.length === 0) return 'Insufficient Data';
 
   if (droppedWindows > 0 && benchParsed) {
-    console.log(`[RollingReturns] ${windowYears}Y: ${droppedWindows} benchmark window(s) dropped (gap > 3 days)`);
+    logger.info(`[RollingReturns] ${windowYears}Y: ${droppedWindows} benchmark window(s) dropped (gap > 3 days)`);
   }
 
   // ── Statistics ──────────────────────────────────────────────
@@ -420,7 +434,9 @@ function calculateRollingReturns(navHistory, windowYears = 1, benchmarkNavHistor
  */
 function calculateStdDev(monthlyReturnsDict) {
   const returns = Object.values(monthlyReturnsDict);
-  if (returns.length < 36) return 'Insufficient Data';
+  // Minimum 12 months — consistent with Sharpe/Sortino relaxation.
+  // StdDev is mathematically valid with any sample; 12 months gives a useful 1-year volatility figure.
+  if (returns.length < 12) return null;
 
   const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
   const squaredDiffs = returns.map(r => Math.pow(r - mean, 2));
@@ -448,14 +464,16 @@ function calculateStdDev(monthlyReturnsDict) {
  */
 function calculateSharpeRatio(monthlyReturnsDict) {
   const returns = Object.values(monthlyReturnsDict);
-  if (returns.length < 36) return 'Insufficient Data';
+  // Minimum 12 months — matches Tickertape / Zerodha Coin behaviour for newer funds.
+  // 36-month requirement was too strict; even 1-year Sharpe is informative with disclosure.
+  if (returns.length < 12) return null;
 
   // Step 1 — monthly risk-free rate via geometric compounding (dynamic, from RBI T-bill)
   let monthlyRf;
   try {
     monthlyRf = getMonthlyRiskFreeRate();
   } catch (err) {
-    console.warn('[Sharpe] Risk-free rate unavailable:', err.message);
+    logger.warn('[Sharpe] Risk-free rate unavailable:', err.message);
     return 'Insufficient Data';
   }
 
@@ -634,7 +652,7 @@ function recomputeRiskLevels(allFunds) {
     reassigned++;
   }
 
-  console.log(`[RiskLevel] Recomputed ${reassigned} risk levels (percentile for equity, static for debt). Preserved ${preserved} official AMFI riskometers.`);
+  logger.info(`[RiskLevel] Recomputed ${reassigned} risk levels (percentile for equity, static for debt). Preserved ${preserved} official AMFI riskometers.`);
 }
 
 
@@ -712,7 +730,8 @@ function calculateMaxDrawdown(navHistory) {
  */
 function calculateSortinoRatio(monthlyReturnsDict) {
   const returns = Object.values(monthlyReturnsDict);
-  if (returns.length < 36) return 'Insufficient Data';
+  // Same 12-month minimum as Sharpe — consistent threshold.
+  if (returns.length < 12) return null;
 
   let monthlyRf;
   try {
@@ -1006,7 +1025,7 @@ function recomputeConsistencyScores(allFunds) {
     }
   }
 
-  console.log(`[ConsistencyScore] Computed scores for ${computed} funds across ${Object.keys(categoryMap).length} sub-categories.`);
+  logger.info(`[ConsistencyScore] Computed scores for ${computed} funds across ${Object.keys(categoryMap).length} sub-categories.`);
 }
 
 /**
@@ -1032,13 +1051,11 @@ function calculateAllMetrics(
   let beta    = 'Insufficient Data';
   const isEquityLike = ['Equity', 'Index', 'ETF'].includes(fundType);
 
-  if (isEquityLike || fundType === 'Hybrid') {
-    sharpe  = calculateSharpeRatio(monthlyReturnsDict);
-    sortino = calculateSortinoRatio(monthlyReturnsDict);
-  } else {
-    sharpe  = null;
-    sortino = null;
-  }
+  // Calculate Sharpe and Sortino for ALL fund types including Debt.
+  // Tickertape and INDmoney show Sharpe for debt funds — it is mathematically valid.
+  // Very low-vol funds (Overnight, Liquid) naturally return null via stdDev ≈ 0 guard.
+  sharpe  = calculateSharpeRatio(monthlyReturnsDict);
+  sortino = calculateSortinoRatio(monthlyReturnsDict);
 
   // Use real TRI data (no TER correction required)
   let betaBenchmarkData = fundBenchmarkTRI;
@@ -1059,13 +1076,13 @@ function calculateAllMetrics(
     beta = null;
   }
 
-  let rollingReturn1y = null;
-  let rollingReturn3y = null;
-  if (optionType !== 'IDCW') {
-    // Use per-fund TRI for rolling returns (same source as Beta benchmark)
-    rollingReturn1y = calculateRollingReturns(navHistory, 1, fundBenchmarkTRI);
-    rollingReturn3y = calculateRollingReturns(navHistory, 3, fundBenchmarkTRI);
-  }
+  // Calculate rolling returns for ALL plans including IDCW.
+  // For IDCW: NAV drops on dividend payment dates (ex-dividend effect).
+  // Returns reflect NAV movement only — dividends declared are not included.
+  // This matches Tickertape / INDmoney methodology for IDCW plans.
+  const rollingReturn1y = calculateRollingReturns(navHistory, 1, fundBenchmarkTRI);
+  const rollingReturn3y = calculateRollingReturns(navHistory, 3, fundBenchmarkTRI);
+  const isIdcwPlan = optionType === 'IDCW'; // UI flag: show dividends-not-included caveat
 
   // ── New Metrics ─────────────────────────────────────────────────────────────
 
@@ -1083,7 +1100,7 @@ function calculateAllMetrics(
   let jensensAlpha    = null;
   let upsideCapture   = null;
   let downsideCapture = null;
-  let informationRatio = isEquityLike ? 'Insufficient Data' : null;
+  let informationRatio = null; // null = not available (for both equity-without-TRI and non-equity)
   let rSquared         = null;
 
   if (isEquityLike && benchReturnsDict && Object.keys(benchReturnsDict).length >= 36) {
@@ -1125,6 +1142,7 @@ function calculateAllMetrics(
     ...cagrs,
     rollingReturn1y,
     rollingReturn3y,
+    isIdcwPlan,          // true for IDCW plans — UI shows dividends-not-included caveat
     sharpeRatio: sharpe,
     sortinoRatio: sortino,
     standardDeviation: stdDev,

@@ -1,5 +1,6 @@
 /**
- * Data Fetcher
+
+const logger = require('../shared/logger'); * Data Fetcher
  * Fetches historical NAV from mfapi.in, manages disk cache,
  * provides TER lookup, and fetches AUM from AMFI reports.
  */
@@ -62,7 +63,7 @@ function writeCache(schemeCode, data) {
   try {
     fs.writeFileSync(cachePath, JSON.stringify(data), 'utf-8');
   } catch (err) {
-    console.error(`[Cache] Failed to write cache for ${schemeCode}:`, err.message);
+    logger.error(`[Cache] Failed to write cache for ${schemeCode}:`, err.message);
   }
 }
 
@@ -87,12 +88,12 @@ async function fetchWithRetry(url, maxRetries = 3, baseDelayMs = 300) {
       if (resp.status === 429) {
         // Rate limited — back off
         const delay = baseDelayMs * Math.pow(2, attempt);
-        console.warn(`[mfapi] 429 Rate limited on ${url}, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1})`);
+        logger.warn(`[mfapi] 429 Rate limited on ${url}, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1})`);
         await sleep(delay);
         continue;
       }
       if (!resp.ok) {
-        console.error(`[mfapi] HTTP ${resp.status} for ${url}`);
+        logger.error(`[mfapi] HTTP ${resp.status} for ${url}`);
         return null;
       }
       return await resp.json();
@@ -100,12 +101,12 @@ async function fetchWithRetry(url, maxRetries = 3, baseDelayMs = 300) {
       lastError = err;
       if (attempt < maxRetries) {
         const delay = baseDelayMs * Math.pow(2, attempt);
-        console.warn(`[mfapi] Error on ${url}: ${err.message}, retrying in ${delay}ms (attempt ${attempt + 1})`);
+        logger.warn(`[mfapi] Error on ${url}: ${err.message}, retrying in ${delay}ms (attempt ${attempt + 1})`);
         await sleep(delay);
       }
     }
   }
-  console.error(`[mfapi] All retries exhausted for ${url}:`, lastError?.message);
+  logger.error(`[mfapi] All retries exhausted for ${url}:`, lastError?.message);
   return null;
 }
 
@@ -141,7 +142,7 @@ async function batchFetchNavs(schemeCodes, progressCb = null, delayMs = 100) {
   let cached = 0;
   const CONCURRENCY = 10; // fetch 10 NAVs in parallel
 
-  console.log(`[Fetcher] Starting batch fetch for ${total} schemes (concurrency=${CONCURRENCY})...`);
+  logger.info(`[Fetcher] Starting batch fetch for ${total} schemes (concurrency=${CONCURRENCY})...`);
 
   // Separate cached from uncached
   const toFetch = [];
@@ -173,7 +174,7 @@ async function batchFetchNavs(schemeCodes, progressCb = null, delayMs = 100) {
     }
   }
 
-  console.log(`[Fetcher] Completed: ${completed}/${total} (${cached} from cache)`);
+  logger.info(`[Fetcher] Completed: ${completed}/${total} (${cached} from cache)`);
   return results;
 }
 
@@ -200,7 +201,7 @@ function normalizeSchemeName(name) {
  */
 async function downloadTERForMonth(monthStr) {
   const url = `${AMFI_TER_API}?MF_ID=All&Month=${monthStr}&strCat=-1&strType=-1&excel=true`;
-  console.log(`[TER] Downloading TER data for ${monthStr}...`);
+  logger.info(`[TER] Downloading TER data for ${monthStr}...`);
 
   try {
     const controller = new AbortController();
@@ -209,7 +210,7 @@ async function downloadTERForMonth(monthStr) {
     clearTimeout(timeout);
 
     if (!resp.ok) {
-      console.error(`[TER] HTTP ${resp.status} for ${monthStr}`);
+      logger.error(`[TER] HTTP ${resp.status} for ${monthStr}`);
       return null;
     }
 
@@ -217,7 +218,7 @@ async function downloadTERForMonth(monthStr) {
     const buffer = Buffer.from(arrayBuf);
 
     if (buffer.length < 1000) {
-      console.warn(`[TER] Response too small (${buffer.length} bytes) for ${monthStr} — likely no data yet`);
+      logger.warn(`[TER] Response too small (${buffer.length} bytes) for ${monthStr} — likely no data yet`);
       return null;
     }
 
@@ -225,14 +226,14 @@ async function downloadTERForMonth(monthStr) {
     ensureCacheDir();
     const cachePath = path.join(CACHE_DIR, TER_CACHE_FILE);
     fs.writeFileSync(cachePath, buffer);
-    console.log(`[TER] Saved ${(buffer.length / 1024 / 1024).toFixed(1)}MB TER Excel to cache`);
+    logger.info(`[TER] Saved ${(buffer.length / 1024 / 1024).toFixed(1)}MB TER Excel to cache`);
 
     return parseTERExcel(cachePath, monthStr);
   } catch (err) {
     if (err.name === 'AbortError') {
-      console.error(`[TER] Download timed out for ${monthStr}`);
+      logger.error(`[TER] Download timed out for ${monthStr}`);
     } else {
-      console.error(`[TER] Download error for ${monthStr}:`, err.message);
+      logger.error(`[TER] Download error for ${monthStr}:`, err.message);
     }
     return null;
   }
@@ -253,7 +254,7 @@ function parseTERExcel(excelPath, monthLabel) {
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: true });
 
     if (rows.length < 2) {
-      console.warn('[TER] Excel has no data rows');
+      logger.warn('[TER] Excel has no data rows');
       return null;
     }
 
@@ -267,7 +268,7 @@ function parseTERExcel(excelPath, monthLabel) {
     }
 
     if (maxDate === 0) {
-      console.warn('[TER] No valid dates found in Excel');
+      logger.warn('[TER] No valid dates found in Excel');
       return null;
     }
 
@@ -275,7 +276,7 @@ function parseTERExcel(excelPath, monthLabel) {
     const epoch = new Date(1899, 11, 30);
     const latestDate = new Date(epoch.getTime() + maxDate * 86400000);
     const dateStr = latestDate.toISOString().split('T')[0];
-    console.log(`[TER] Using TER data for latest date: ${dateStr}`);
+    logger.info(`[TER] Using TER data for latest date: ${dateStr}`);
 
     // Second pass: extract TER for rows matching the latest date
     const terMap = {};
@@ -302,10 +303,10 @@ function parseTERExcel(excelPath, monthLabel) {
       count++;
     }
 
-    console.log(`[TER] Parsed ${count} scheme TER entries for ${dateStr}`);
+    logger.info(`[TER] Parsed ${count} scheme TER entries for ${dateStr}`);
     return terMap;
   } catch (err) {
-    console.error('[TER] Error parsing TER Excel:', err.message);
+    logger.error('[TER] Error parsing TER Excel:', err.message);
     return null;
   }
 }
@@ -318,7 +319,7 @@ function parseTERExcel(excelPath, monthLabel) {
 async function fetchTERData() {
   // Return memory cache if available
   if (_terCache) {
-    console.log(`[TER] Loaded ${Object.keys(_terCache).length} TER entries from memory cache`);
+    logger.info(`[TER] Loaded ${Object.keys(_terCache).length} TER entries from memory cache`);
     return _terCache;
   }
 
@@ -329,7 +330,7 @@ async function fetchTERData() {
     try {
       const raw = fs.readFileSync(jsonCachePath, 'utf-8');
       _terCache = JSON.parse(raw);
-      console.log(`[TER] Loaded ${Object.keys(_terCache).length} TER entries from disk cache`);
+      logger.info(`[TER] Loaded ${Object.keys(_terCache).length} TER entries from disk cache`);
       return _terCache;
     } catch {
       // Cache corrupted, re-fetch
@@ -352,12 +353,12 @@ async function fetchTERData() {
 
   // If current month has no data (start of month), fall back to previous month
   if (!terMap || Object.keys(terMap).length === 0) {
-    console.log(`[TER] No data for current month (${currentMonthStr}), trying previous month (${prevMonthStr})...`);
+    logger.info(`[TER] No data for current month (${currentMonthStr}), trying previous month (${prevMonthStr})...`);
     terMap = await downloadTERForMonth(prevMonthStr);
   }
 
   if (!terMap || Object.keys(terMap).length === 0) {
-    console.error('[TER] Failed to fetch TER data from AMFI for both current and previous months.');
+    logger.error('[TER] Failed to fetch TER data from AMFI for both current and previous months.');
     _terCache = {};
     return {};
   }
@@ -365,9 +366,9 @@ async function fetchTERData() {
   // Save parsed data to disk cache
   try {
     fs.writeFileSync(jsonCachePath, JSON.stringify(terMap), 'utf-8');
-    console.log(`[TER] Saved ${Object.keys(terMap).length} TER entries to disk cache`);
+    logger.info(`[TER] Saved ${Object.keys(terMap).length} TER entries to disk cache`);
   } catch (err) {
-    console.error('[TER] Failed to save TER cache:', err.message);
+    logger.error('[TER] Failed to save TER cache:', err.message);
   }
 
   _terCache = terMap;
@@ -398,8 +399,8 @@ function getTER(fund) {
 }
 
 // ─── AUM ─────────────────────────────────────────────────────
-// AUM data is now managed by services/aumService.js
-// (fetches live AMFI schemewise AAUM quarters via their new API)
+// AUM data is managed by services/fundPerformanceService.js
+
 // This file no longer contains any AUM fetching logic.
 
 // ─── Processed Data Persistence ──────────────────────────────
@@ -409,9 +410,9 @@ function saveProcessedData(funds, categories) {
   const dataPath = path.join(CACHE_DIR, 'processed_funds.json');
   try {
     fs.writeFileSync(dataPath, JSON.stringify({ funds, categories, timestamp: Date.now() }), 'utf-8');
-    console.log(`[Cache] Saved ${funds.length} processed funds to disk`);
+    logger.info(`[Cache] Saved ${funds.length} processed funds to disk`);
   } catch (err) {
-    console.error('[Cache] Failed to save processed data:', err.message);
+    logger.error('[Cache] Failed to save processed data:', err.message);
   }
 }
 
@@ -426,10 +427,10 @@ function loadProcessedData(maxAgeHours = 24) {
     const data = JSON.parse(raw);
     const ageMs = Date.now() - (data.timestamp || 0);
     if (ageMs < maxAgeHours * 60 * 60 * 1000) {
-      console.log(`[Cache] Loaded ${data.funds.length} processed funds from disk`);
+      logger.info(`[Cache] Loaded ${data.funds.length} processed funds from disk`);
       return data;
     }
-    console.log('[Cache] Processed data too old, will refresh');
+    logger.info('[Cache] Processed data too old, will refresh');
     return null;
   } catch {
     return null;

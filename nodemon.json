@@ -1,0 +1,6 @@
+{
+  "watch": ["server.js", "routes", "boot", "shared", "services"],
+  "ignore": ["cache", "public", "dev-tools", "scripts", "tests", "node_modules", "*.log"],
+  "ext": "js,json",
+  "delay": 300
+}

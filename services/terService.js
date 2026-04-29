@@ -1,5 +1,6 @@
 /**
- * terService.js
+
+const logger = require('../shared/logger'); * terService.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Downloads the official AMFI TER Excel file, extracts only the latest-date
  * rows in a single pass, saves the result atomically to ter-data.json, and
@@ -19,10 +20,10 @@ const ExcelJS = require('exceljs');
 const cron = require('node-cron');
 
 // ─── Paths ────────────────────────────────────────────────────────────────────
-
-const ROOT_DIR = path.join(__dirname, '..');
-const TER_JSON = path.join(ROOT_DIR, 'ter-data.json');
-const TER_JSON_TMP = path.join(ROOT_DIR, 'ter-data.tmp.json');
+// All persistent data files live in <project-root>/data/
+const DATA_DIR     = path.join(__dirname, '..', 'data');
+const TER_JSON     = path.join(DATA_DIR, 'ter-data.json');
+const TER_JSON_TMP = path.join(DATA_DIR, 'ter-data.tmp.json');
 
 // ─── AMFI endpoint ────────────────────────────────────────────────────────────
 
@@ -83,7 +84,7 @@ function buildUrl(monthStr) {
  */
 async function downloadExcel(monthStr) {
   const url = buildUrl(monthStr);
-  console.log(`[TER] Downloading TER Excel for ${monthStr} → ${url}`);
+  logger.info(`[TER] Downloading TER Excel for ${monthStr} → ${url}`);
 
   const resp = await axios.get(url, {
     responseType: 'arraybuffer',
@@ -97,13 +98,13 @@ async function downloadExcel(monthStr) {
   const MIN_SIZE = 500 * 1024; // 500 KB
 
   if (buf.length < MIN_SIZE) {
-    console.warn(
+    logger.warn(
       `[TER] Response too small (${buf.length} bytes) for ${monthStr} — likely no data yet`
     );
     return null;
   }
 
-  console.log(`[TER] Downloaded ${(buf.length / 1024 / 1024).toFixed(2)} MB for ${monthStr}`);
+  logger.info(`[TER] Downloaded ${(buf.length / 1024 / 1024).toFixed(2)} MB for ${monthStr}`);
   return buf;
 }
 
@@ -150,7 +151,7 @@ async function parseExcelBuffer(buffer) {
       `[TER] Missing required columns: [${missing.join(', ')}]. ` +
       `Actual headers found: [${actualHeaders}]`
     );
-    console.error(err.message);
+    logger.error(err.message);
     throw err;
   }
 
@@ -247,7 +248,7 @@ async function parseExcelBuffer(buffer) {
   });
 
   const results = Object.values(schemeLatest);
-  console.log(
+  logger.info(
     `[TER] Single-pass complete: ${results.length} unique schemes processed`
   );
   return results;
@@ -276,16 +277,16 @@ async function syncTER() {
   try {
     buffer = await downloadExcel(curStr);
   } catch (err) {
-    console.warn(`[TER] Failed to download ${curStr}: ${err.message}`);
+    logger.warn(`[TER] Failed to download ${curStr}: ${err.message}`);
   }
 
   // Fallback to previous month
   if (!buffer) {
-    console.log(`[TER] Falling back to previous month (${prevStr})...`);
+    logger.info(`[TER] Falling back to previous month (${prevStr})...`);
     try {
       buffer = await downloadExcel(prevStr);
     } catch (err) {
-      console.error(`[TER] Failed to download ${prevStr}: ${err.message}`);
+      logger.error(`[TER] Failed to download ${prevStr}: ${err.message}`);
     }
   }
 
@@ -303,7 +304,7 @@ async function syncTER() {
   const payload = JSON.stringify(records, null, 2);
   fs.writeFileSync(TER_JSON_TMP, payload, 'utf-8');
   fs.renameSync(TER_JSON_TMP, TER_JSON);
-  console.log(`[TER] Atomically wrote ${records.length} records to ter-data.json`);
+  logger.info(`[TER] Atomically wrote ${records.length} records to ter-data.json`);
 
   // Reload in-memory index
   loadTERIndex(records);
@@ -330,7 +331,7 @@ function loadTERIndex(records) {
   }
   _terIndex = newIndex;
   _terDate = records[0]?.date ?? null;
-  console.log(
+  logger.info(
     `[TER] In-memory index rebuilt: ${Object.keys(_terIndex).length} schemes (date: ${_terDate})`
   );
 }
@@ -346,22 +347,22 @@ async function initTER() {
       const records = JSON.parse(raw);
       if (Array.isArray(records) && records.length > 0) {
         loadTERIndex(records);
-        console.log('[TER] Loaded TER index from ter-data.json at startup');
+        logger.info('[TER] Loaded TER index from ter-data.json at startup');
         return;
       }
     } catch (err) {
-      console.warn(`[TER] Could not read ter-data.json: ${err.message} — will sync now`);
+      logger.warn(`[TER] Could not read ter-data.json: ${err.message} — will sync now`);
     }
   } else {
-    console.warn('[TER] ter-data.json not found — triggering initial sync...');
+    logger.warn('[TER] ter-data.json not found — triggering initial sync...');
   }
 
   // File missing or corrupt — sync now (non-crashing)
   try {
     await syncTER();
   } catch (err) {
-    console.error('[TER] Initial sync failed:', err.message);
-    console.error('[TER] Server will continue without TER data. Retry via /admin/sync-ter');
+    logger.error('[TER] Initial sync failed:', err.message);
+    logger.error('[TER] Server will continue without TER data. Retry via /admin/sync-ter');
   }
 }
 
@@ -449,19 +450,19 @@ function getTERMissCount() {
 function scheduleTERCron() {
   // '30 3 * * *' = 03:30 UTC = 09:00 IST
   cron.schedule('30 3 * * *', async () => {
-    console.log('[TER] Cron: starting scheduled daily TER sync...');
+    logger.info('[TER] Cron: starting scheduled daily TER sync...');
     try {
       const count = await syncTER();
-      console.log(`[TER] Cron: sync complete — ${count} schemes updated`);
+      logger.info(`[TER] Cron: sync complete — ${count} schemes updated`);
     } catch (err) {
       const msg = `[TER] Cron: daily sync FAILED — ${err.message}`;
-      console.error(msg);
+      logger.error(msg);
     }
   }, {
     timezone: 'Asia/Kolkata',
   });
 
-  console.log('[TER] Daily cron scheduled at 09:00 IST');
+  logger.info('[TER] Daily cron scheduled at 09:00 IST');
 }
 
 // ─── Exports ─────────────────────────────────────────────────────────────────

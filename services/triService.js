@@ -1,5 +1,6 @@
 /**
- * triService.js
+
+const logger = require('../shared/logger'); * triService.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Fetches and caches real Total Return Index (TRI) time-series data for all
  * benchmark indices used by Indian mutual funds.
@@ -45,10 +46,10 @@ const cron = require('node-cron');
 const { execSync } = require('child_process');
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
-
-const ROOT_DIR = path.join(__dirname, '..');
-const TRI_JSON = path.join(ROOT_DIR, 'tri-data.json');
-const TRI_JSON_TMP = path.join(ROOT_DIR, 'tri-data.tmp.json');
+// All persistent data files live in <project-root>/data/
+const DATA_DIR     = path.join(__dirname, '..', 'data');
+const TRI_JSON     = path.join(DATA_DIR, 'tri-data.json');
+const TRI_JSON_TMP = path.join(DATA_DIR, 'tri-data.tmp.json');
 
 // ─── API Config ───────────────────────────────────────────────────────────────
 
@@ -343,7 +344,7 @@ async function fetchNiftyTRI(niftyIndexName, startDateStr, endDateStr) {
     });
 
     if (!resp.ok) {
-      console.warn(`[TRI] Nifty API HTTP ${resp.status} for ${niftyIndexName}`);
+      logger.warn(`[TRI] Nifty API HTTP ${resp.status} for ${niftyIndexName}`);
       return [];
     }
 
@@ -362,14 +363,14 @@ async function fetchNiftyTRI(niftyIndexName, startDateStr, endDateStr) {
 
     // Sort oldest-first
     result.sort((a, b) => a.date - b.date);
-    console.log(`[TRI] Nifty "${niftyIndexName}": ${result.length} data points`);
+    logger.info(`[TRI] Nifty "${niftyIndexName}": ${result.length} data points`);
     return result;
 
   } catch (err) {
     if (err.name === 'AbortError') {
-      console.warn(`[TRI] Nifty API timeout for ${niftyIndexName}`);
+      logger.warn(`[TRI] Nifty API timeout for ${niftyIndexName}`);
     } else {
-      console.warn(`[TRI] Nifty API error for ${niftyIndexName}: ${err.message}`);
+      logger.warn(`[TRI] Nifty API error for ${niftyIndexName}: ${err.message}`);
     }
     return [];
   } finally {
@@ -442,7 +443,7 @@ function fetchBSEAllIndicesCSV(ddmmyyyy) {
  * @returns {{date: Date, nav: number}[]} sorted oldest-first
  */
 async function fetchBSETRI(bseIndexCode) {
-  console.log(`[TRI] BSE "${bseIndexCode}": fetching 10Y of weekly data...`);
+  logger.info(`[TRI] BSE "${bseIndexCode}": fetching 10Y of weekly data...`);
 
   const endDate = new Date();
   const startDate = new Date();
@@ -477,7 +478,7 @@ async function fetchBSETRI(bseIndexCode) {
   }
 
   series.sort((a, b) => a.date - b.date);
-  console.log(`[TRI] BSE "${bseIndexCode}": ${series.length} data points`);
+  logger.info(`[TRI] BSE "${bseIndexCode}": ${series.length} data points`);
   return series;
 }
 
@@ -607,7 +608,7 @@ async function syncTRI(benchmarkNames) {
   }
 
   // Single summary line (replaces one warn per fund)
-  console.log(
+  logger.info(
     `[TRI] Syncing TRI for ${unique.length} unique benchmarks ` +
     `— ${niftyBenches.length} Nifty, ${bseBenches.length} BSE→proxy, ` +
     `${foreignBenches.length} foreign (skip), ${compositeBenches.length} composite (skip)` +
@@ -616,7 +617,7 @@ async function syncTRI(benchmarkNames) {
 
   // Log unmapped benchmarks once as a group for developer action
   if (unknownBenches.length > 0) {
-    console.log(
+    logger.info(
       `[TRI] No mapping for ${unknownBenches.length} benchmark(s) — add to NIFTY_BENCHMARK_MAP or BSE_BENCHMARK_MAP:\n` +
       unknownBenches.map(b => `       "${b}"`).join('\n')
     );
@@ -645,7 +646,7 @@ async function syncTRI(benchmarkNames) {
       // Index not found or not yet in API (e.g., recently launched) — fallback to NIFTY 500
       const FALLBACK = 'NIFTY 500';
       if (niftyName !== FALLBACK) {
-        console.warn(`[TRI] "${niftyName}" returned 0 pts — falling back to "${FALLBACK}" proxy`);
+        logger.warn(`[TRI] "${niftyName}" returned 0 pts — falling back to "${FALLBACK}" proxy`);
         if (!niftyCache[FALLBACK]) {
           await sleep(300);
           niftyCache[FALLBACK] = await fetchNiftyTRI(FALLBACK, startStr, endStr);
@@ -657,7 +658,7 @@ async function syncTRI(benchmarkNames) {
       _triStore[benchName] = series;
       synced++;
     } else {
-      console.warn(`[TRI] No data for "${benchName}" (→ ${niftyName})`);
+      logger.warn(`[TRI] No data for "${benchName}" (→ ${niftyName})`);
     }
   }
 
@@ -667,7 +668,7 @@ async function syncTRI(benchmarkNames) {
     const niftyProxy = BSE_NIFTY_PROXY[bseCode];
 
     if (niftyProxy) {
-      console.log(`[TRI] BSE "${bseCode}" — using Nifty proxy "${niftyProxy}" directly (faster, same data quality)`);
+      logger.info(`[TRI] BSE "${bseCode}" — using Nifty proxy "${niftyProxy}" directly (faster, same data quality)`);
       await sleep(300);
       if (!niftyCache[niftyProxy]) {
         niftyCache[niftyProxy] = await fetchNiftyTRI(niftyProxy, startStr, endStr);
@@ -676,23 +677,23 @@ async function syncTRI(benchmarkNames) {
       if (series.length > 0) {
         _triStore[benchName] = series;
         synced++;
-        console.log(`[TRI] BSE "${benchName}" via proxy: ${series.length} data points`);
+        logger.info(`[TRI] BSE "${benchName}" via proxy: ${series.length} data points`);
       }
     } else {
       // No Nifty proxy — try BSE CSV (slow, likely to fail, last resort)
-      console.log(`[TRI] BSE "${bseCode}" has no Nifty proxy — attempting slow BSE CSV fetch...`);
+      logger.info(`[TRI] BSE "${bseCode}" has no Nifty proxy — attempting slow BSE CSV fetch...`);
       await sleep(200);
       const series = await fetchBSETRI(bseCode);
       if (series.length > 0) {
         _triStore[benchName] = series;
         synced++;
       } else {
-        console.warn(`[TRI] No data returned for BSE benchmark: "${benchName}" (code: ${bseCode})`);
+        logger.warn(`[TRI] No data returned for BSE benchmark: "${benchName}" (code: ${bseCode})`);
       }
     }
   }
 
-  console.log(`[TRI] Sync complete: ${synced}/${niftyBenches.length + bseBenches.length} mappable benchmarks have data`);
+  logger.info(`[TRI] Sync complete: ${synced}/${niftyBenches.length + bseBenches.length} mappable benchmarks have data`);
   return synced;
 }
 
@@ -719,7 +720,7 @@ function saveTRI() {
 
   fs.writeFileSync(TRI_JSON_TMP, payload, 'utf-8');
   fs.renameSync(TRI_JSON_TMP, TRI_JSON);
-  console.log(`[TRI] Saved ${Object.keys(_triStore).length} TRI series to tri-data.json`);
+  logger.info(`[TRI] Saved ${Object.keys(_triStore).length} TRI series to tri-data.json`);
 }
 
 function loadTRI() {
@@ -740,12 +741,12 @@ function loadTRI() {
     const isIncomplete = seriesCount < 3;
 
     if (isIncomplete) {
-      console.log(`[TRI] tri-data.json is incomplete (${seriesCount} series) — will force full refresh`);
+      logger.info(`[TRI] tri-data.json is incomplete (${seriesCount} series) — will force full refresh`);
     } else if (ageDays >= TRI_MAX_AGE_DAYS) {
-      console.log(`[TRI] tri-data.json is ${ageDays.toFixed(1)}d old — will refresh`);
+      logger.info(`[TRI] tri-data.json is ${ageDays.toFixed(1)}d old — will refresh`);
       // Load old data into memory anyway (used as fallback if fresh fetch fails)
     } else {
-      console.log(`[TRI] tri-data.json is fresh (${ageDays.toFixed(1)}d old, ${seriesCount} series)`);
+      logger.info(`[TRI] tri-data.json is fresh (${ageDays.toFixed(1)}d old, ${seriesCount} series)`);
     }
 
     _triStore = {};
@@ -756,12 +757,12 @@ function loadTRI() {
       }));
     }
 
-    console.log(`[TRI] Loaded ${Object.keys(_triStore).length} TRI series from disk`);
+    logger.info(`[TRI] Loaded ${Object.keys(_triStore).length} TRI series from disk`);
     // Return false (= stale) if incomplete, so initTRI triggers a full sync
     if (isIncomplete) return false;
     return ageDays < TRI_MAX_AGE_DAYS; // true = fresh (don't need to re-sync)
   } catch (err) {
-    console.warn(`[TRI] Could not parse tri-data.json: ${err.message}`);
+    logger.warn(`[TRI] Could not parse tri-data.json: ${err.message}`);
     return false;
   }
 }
@@ -786,11 +787,11 @@ async function initTRI(benchmarkNames) {
     });
 
     if (missing.length === 0) {
-      console.log(`[TRI] All ${Object.keys(_triStore).length} required TRI series found in cache`);
+      logger.info(`[TRI] All ${Object.keys(_triStore).length} required TRI series found in cache`);
       return;
     }
 
-    console.log(`[TRI] ${missing.length} benchmarks missing from cache — fetching: ${missing.join(', ')}`);
+    logger.info(`[TRI] ${missing.length} benchmarks missing from cache — fetching: ${missing.join(', ')}`);
     const syncCount = await syncTRI(missing);
     if (syncCount > 0) saveTRI();
     return;
@@ -802,7 +803,7 @@ async function initTRI(benchmarkNames) {
     const count = await syncTRI(benchmarkNames || []);
     if (count > 0) saveTRI();
   } catch (err) {
-    console.error('[TRI] Init sync failed:', err.message);
+    logger.error('[TRI] Init sync failed:', err.message);
     // If old data is in _triStore from loadTRI(), it remains usable as fallback
   }
 }
@@ -845,17 +846,17 @@ function setTRIBenchmarksForCron(benchmarkNames) {
 
 function scheduleTRICron() {
   cron.schedule('31 9 * * *', async () => {
-    console.log('[TRI] Cron: daily TRI refresh triggered');
+    logger.info('[TRI] Cron: daily TRI refresh triggered');
     try {
       const count = await syncTRI(_benchmarkNamesForCron);
       if (count > 0) saveTRI();
-      console.log(`[TRI] Cron: refresh complete — ${count} indices updated`);
+      logger.info(`[TRI] Cron: refresh complete — ${count} indices updated`);
     } catch (err) {
-      console.error('[TRI] Cron: refresh FAILED —', err.message);
+      logger.error('[TRI] Cron: refresh FAILED —', err.message);
     }
   }, { timezone: 'Asia/Kolkata' });
 
-  console.log('[TRI] Daily TRI cron scheduled (09:31 IST)');
+  logger.info('[TRI] Daily TRI cron scheduled (09:31 IST)');
 }
 
 // ─── Exports ─────────────────────────────────────────────────────────────────

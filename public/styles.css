@@ -222,3 +222,118 @@ input[type="checkbox"] {
   color: white;
   box-shadow: 0 1px 3px rgba(0, 6, 102, 0.3);
 }
+
+/* ─── Fund Detail Layout Fixes ─── */
+
+/* Prevent fund name from overflowing header */
+#fund-detail-content h1 {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Key facts rows: clamp label width & allow value to wrap */
+#fund-detail-content section .flex.justify-between > span:last-child {
+  word-break: break-word;
+  text-align: right;
+  max-width: 60%;
+}
+
+/* All grid children: never clip text, never overflow container */
+#fund-detail-content .grid > div,
+#fund-detail-content .grid > section {
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Prevent any chart canvas from forcing width beyond parent */
+#navChart {
+  max-width: 100%;
+}
+
+/* ── Inner metric card grids: use auto-fill so they wrap naturally ── */
+/* Returns grid: CAGR 1Y/3Y/5Y/Since Inception */
+#fund-detail-content .grid.grid-cols-2.md\:grid-cols-4 {
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+}
+
+/* Risk metrics grid (Sharpe, StdDev, Beta) */
+#fund-detail-content .grid.grid-cols-2.md\:grid-cols-4:has(> div:nth-child(4)) {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+
+/* Calmar + Sortino 2-col grid */
+#fund-detail-content .grid.grid-cols-2:not(.md\:grid-cols-4) {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+/* Market Capture Ratios 2-col grid */
+#fund-detail-content .grid.grid-cols-2 + div,
+#fund-detail-content .mb-8 .grid.grid-cols-2 {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+/* Information Ratio 4-col period grid */
+#fund-detail-content .grid.grid-cols-4 {
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+}
+
+/* Rolling returns inner 2-col grid */
+#fund-detail-content .grid.grid-cols-1.md\:grid-cols-2 {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+/* Rolling return sub-cards inner 2-col stat grid */
+#fund-detail-content .grid.grid-cols-2.gap-3 {
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+}
+
+/* Capture ratio cards: stack on narrow widths */
+#fund-detail-content .grid.grid-cols-2 .p-5.rounded-xl {
+  min-width: 0;
+}
+
+/* The main bento layout: single column below 2xl, side-by-side at 2xl+ */
+#fund-detail-content > .grid {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 1536px) {
+  #fund-detail-content > .grid {
+    grid-template-columns: repeat(12, 1fr);
+  }
+}
+
+/* Prevent Advanced Metrics section content from overflowing */
+#advanced-metrics-section {
+  min-width: 0;
+  overflow: hidden;
+}
+
+#advanced-metrics-section .space-y-4 > div,
+#advanced-metrics-section .space-y-4 > section {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+/* Information ratio legend: wrap on narrow widths */
+#advanced-metrics-section .flex.items-center.gap-3.text-\[9px\] {
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+/* Drawdown timeline: wrap icons on very small widths */
+#fund-detail-content .flex.items-center.gap-3.text-xs {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Ensure section containers never overflow on mobile */
+#view-fund {
+  overflow-x: hidden;
+}
+
+#view-fund section {
+  min-width: 0;
+  overflow: hidden;
+}

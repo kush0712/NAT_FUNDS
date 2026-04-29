@@ -796,9 +796,9 @@ async function renderFundDetail(schemeCode) {
       </div>
       
       <!-- Bento Grid -->
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div class="grid grid-cols-1 2xl:grid-cols-12 gap-8">
         <!-- Performance Section -->
-        <div class="lg:col-span-8 space-y-8">
+        <div class="2xl:col-span-8 space-y-8 min-w-0">
           <!-- NAV Chart -->
           <section class="bg-surface-container-lowest p-8 rounded-xl shadow-sm">
             <div class="flex justify-between items-center mb-6">
@@ -812,7 +812,7 @@ async function renderFundDetail(schemeCode) {
                 <button onclick="updateNavChart('${schemeCode}', '5y')" id="btn-chart-5y" class="px-3 py-1 bg-white shadow-sm text-primary text-[10px] font-bold rounded-md uppercase">5Y</button>
               </div>
             </div>
-            <div class="h-[280px] w-full relative">
+            <div class="h-[280px] w-full relative overflow-hidden">
               <canvas id="navChart"></canvas>
             </div>
           </section>
@@ -825,7 +825,12 @@ async function renderFundDetail(schemeCode) {
             <div class="mb-8">
               <h3 class="text-xs font-bold uppercase tracking-widest text-outline mb-1">Returns</h3>
               <p class="text-[10px] text-on-surface-variant mb-4">Trailing as of ${new Date().toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'})} (latest NAV)</p>
-              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              ${fund.fundAgeMonths != null && fund.fundAgeMonths < 36 ? `
+              <div class="flex items-start gap-2 text-[10px] text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-3">
+                <span class="material-symbols-outlined text-sm shrink-0">info</span>
+                <span>This fund is <strong>${fund.fundAgeMonths} months old</strong>. Metrics requiring 3-year history (CAGR 3Y, Beta, etc.) are unavailable — consistent with Tickertape &amp; Zerodha Coin.</span>
+              </div>` : ''}
+              <div class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">
                 <div class="p-4 rounded-lg bg-surface-container-low">
                   <p class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1 flex items-center gap-1">
                     CAGR 1Y ${tooltipHtml('cagr1y')}
@@ -843,6 +848,14 @@ async function renderFundDetail(schemeCode) {
                     CAGR 5Y ${tooltipHtml('cagr5y')}
                   </p>
                   <p class="text-xl font-bold tabular-nums">${fmt(fund.cagr5y)}</p>
+                </div>
+                <div class="p-4 rounded-lg bg-primary-container">
+                  <p class="text-[10px] font-bold text-on-primary-container uppercase tracking-widest mb-1">
+                    Since Inception
+                  </p>
+                  <p class="text-xl font-bold tabular-nums text-primary">${fmt(fund.cagrSinceInception)}</p>
+                  ${fund.fundAgeMonths != null ? `<p class="text-[9px] text-on-surface-variant mt-1">${fund.fundAgeMonths} months</p>` : ''}
+                </div>
               </div>
             </div>
 
@@ -850,13 +863,17 @@ async function renderFundDetail(schemeCode) {
             ${(fund.rollingReturn1y && typeof fund.rollingReturn1y === 'object') || (fund.rollingReturn3y && typeof fund.rollingReturn3y === 'object') ? `
             <div class="mb-8">
               <h3 class="text-xs font-bold uppercase tracking-widest text-outline mb-4">Rolling Returns Analysis (Daily CAGR)</h3>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              ${fund.isIdcwPlan ? `<div class="flex items-start gap-2 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+                <span class="material-symbols-outlined text-sm shrink-0">info</span>
+                <span>IDCW plan: returns are based on <strong>NAV movement only</strong> — dividends declared are not included in these figures.</span>
+              </div>` : ''}
+              <div class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">
                 ${fund.rollingReturn1y && typeof fund.rollingReturn1y === 'object' ? `
                 <div class="p-5 rounded-lg bg-surface-container-low border border-outline-variant/10">
                   <p class="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3 flex items-center gap-1">
                     1-Year Rolling ${tooltipHtml('rollingReturn1y')}
                   </p>
-                  <div class="grid grid-cols-2 gap-3 mb-3">
+                  <div class="grid gap-3 mb-3" style="grid-template-columns:repeat(auto-fill,minmax(100px,1fr))">
                     <div>
                       <p class="text-[10px] text-outline uppercase">Median</p>
                       <p class="text-xl font-bold tabular-nums">${fmt(fund.rollingReturn1y.median)}</p>
@@ -894,7 +911,7 @@ async function renderFundDetail(schemeCode) {
                   <p class="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3 flex items-center gap-1">
                     3-Year Rolling ${tooltipHtml('rollingReturn3y')}
                   </p>
-                  <div class="grid grid-cols-2 gap-3 mb-4">
+                  <div class="grid gap-3 mb-4" style="grid-template-columns:repeat(auto-fill,minmax(100px,1fr))">
                     <div>
                       <p class="text-[10px] text-outline uppercase">Median</p>
                       <p class="text-xl font-bold tabular-nums">${fmt(fund.rollingReturn3y.median)}</p>
@@ -967,10 +984,10 @@ async function renderFundDetail(schemeCode) {
                     <span class="font-semibold">${fund.subCategory}</span> funds — returns are near-constant by design.
                     Use <strong>YTM</strong> and <strong>Modified Duration</strong> as primary risk signals for these funds.
                    </p>`
-                : `<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    ${isEquityLike || fund.type === 'Hybrid' ? '<div class="p-4 rounded-lg bg-surface-container-low"><p class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1 flex items-center gap-1">Sharpe Ratio ' + tooltipHtml('sharpeRatio') + '</p><p class="text-xl font-bold tabular-nums">' + fmt(fund.sharpeRatio, '', 2) + '</p></div>' : ''}
+                : `<div class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">
+                    ${(isEquityLike || fund.type === 'Hybrid') ? `<div class="p-4 rounded-lg bg-surface-container-low"><p class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1 flex items-center gap-1">Sharpe Ratio ${tooltipHtml('sharpeRatio')}</p><p class="text-xl font-bold tabular-nums">${fmt(fund.sharpeRatio, '', 2)}</p></div>` : ''}
                     <div class="p-4 rounded-lg bg-surface-container-low"><p class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1 flex items-center gap-1">Std Deviation ${tooltipHtml('standardDeviation')}</p><p class="text-xl font-bold tabular-nums">${fmt(fund.standardDeviation)}</p></div>
-                    ${isEquityLike ? '<div class="p-4 rounded-lg bg-surface-container-low"><p class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1 flex items-center gap-1">Beta ' + tooltipHtml('beta') + '</p><p class="text-xl font-bold tabular-nums">' + fmt(fund.beta, '', 2) + '</p></div>' : ''}
+                    ${isEquityLike ? `<div class="p-4 rounded-lg bg-surface-container-low"><p class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1 flex items-center gap-1">Beta ${tooltipHtml('beta')}</p><p class="text-xl font-bold tabular-nums">${fmt(fund.beta, '', 2)}</p></div>` : ''}
                    </div>`
               }
             </div>
@@ -1013,7 +1030,7 @@ async function renderFundDetail(schemeCode) {
             </div>` : ''}
             
             <!-- Calmar + Sortino -->
-            <div class="grid grid-cols-2 gap-4 mb-8">
+            <div class="grid gap-4 mb-8" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
               <div class="p-4 rounded-lg bg-surface-container-low">
                 <p class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1 flex items-center gap-1">
                   Calmar Ratio ${tooltipHtml('calmarRatio')}
@@ -1040,7 +1057,7 @@ async function renderFundDetail(schemeCode) {
                   <span class="glass-tooltip" style="width:16rem">${METRIC_TOOLTIPS.upsideCapture} ${METRIC_TOOLTIPS.downsideCapture}</span>
                 </span>
               </h3>
-              <div class="grid grid-cols-2 gap-4">
+               <div class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
                 <div class="p-5 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200/60 text-center">
                   <p class="text-[10px] font-bold uppercase tracking-widest text-emerald-700 mb-2">Upside Capture</p>
                   <p class="text-3xl font-extrabold tabular-nums text-emerald-700">${typeof fund.upsideCapture === 'number' ? fund.upsideCapture.toFixed(0) : 'N/A'}<span class="text-lg">%</span></p>
@@ -1093,7 +1110,7 @@ async function renderFundDetail(schemeCode) {
                   Information Ratio ${tooltipHtml('informationRatio')}
                   <span class="ml-auto text-[9px] normal-case font-medium text-outline bg-surface-container px-2 py-0.5 rounded-full">Source: AMFI</span>
                 </p>
-                <div class="grid grid-cols-4 gap-2">
+                <div class="grid gap-2" style="grid-template-columns:repeat(4,minmax(60px,1fr))">
                   ${[
                     { period: '1Y',  val: fund.amfiIR.ir1y  },
                     { period: '3Y',  val: fund.amfiIR.ir3y  },
@@ -1126,9 +1143,9 @@ async function renderFundDetail(schemeCode) {
         </div>
         
         <!-- Sidebar Facts -->
-        <div class="lg:col-span-4 space-y-8">
+        <div class="2xl:col-span-4 space-y-6 min-w-0">
           <!-- Key Facts -->
-          <section class="bg-primary text-white p-8 rounded-xl shadow-xl">
+          <section class="bg-primary text-white p-6 rounded-xl shadow-xl">
             <h2 class="text-lg font-bold font-headline mb-6 border-b border-white/10 pb-4">Key Fund Facts</h2>
             <div class="space-y-5">
               <div class="flex justify-between items-center">
@@ -1160,7 +1177,7 @@ async function renderFundDetail(schemeCode) {
           
           <!-- Consistency Score Gauge -->
           ${fund.consistencyScore !== null && fund.consistencyScore !== undefined ? `
-          <section class="bg-surface-container-lowest p-8 rounded-xl">
+          <section class="bg-surface-container-lowest p-6 rounded-xl">
             <div class="flex items-center justify-between mb-2">
               <span class="text-sm font-semibold flex items-center gap-1">Consistency Score ${tooltipHtml('consistencyScore')}</span>
               <span class="text-[10px] text-on-surface-variant">vs. ${fund.subCategory} peers</span>
@@ -1190,7 +1207,7 @@ async function renderFundDetail(schemeCode) {
           ` : ''}
           
           <!-- Risk Meter -->
-          <section class="bg-surface-container-lowest p-8 rounded-xl">
+          <section class="bg-surface-container-lowest p-6 rounded-xl">
             <div class="flex items-center justify-between mb-4">
               <span class="text-sm font-semibold flex items-center gap-1">Risk Meter ${tooltipHtml('riskLevel')}</span>
               ${fund.riskLevel ? `<span class="px-2 py-0.5 ${getRiskBadgeColor(fund.riskLevel)} text-[10px] font-bold rounded uppercase">${fund.riskLevel}</span>` : ''}
@@ -1308,6 +1325,7 @@ async function renderCompare() {
     // Build comparison grid
     const metrics = [
       { group: 'Performance', items: [
+        { key: 'cagrSinceInception', label: 'Since Inception CAGR', suffix: '%' },
         { key: 'cagr1y', label: 'CAGR 1Y', suffix: '%' },
         { key: 'cagr3y', label: 'CAGR 3Y', suffix: '%' },
         { key: 'cagr5y', label: 'CAGR 5Y', suffix: '%' },
@@ -1315,9 +1333,9 @@ async function renderCompare() {
         { key: 'rollingReturn3y', label: 'Rolling Median (3Y)', suffix: '%' },
       ]},
       { group: 'Risk & Volatility', items: [
-        ...(isEquityLike ? [{ key: 'sharpeRatio', label: 'Sharpe Ratio', suffix: '' }] : []),
-        ...(isEquityLike ? [{ key: 'sortinoRatio', label: 'Sortino Ratio', suffix: '' }] : []),
-        { key: 'standardDeviation', label: 'Standard Deviation', suffix: '%' },
+        { key: 'sharpeRatio', label: 'Sharpe Ratio', suffix: '' },
+        { key: 'sortinoRatio', label: 'Sortino Ratio', suffix: '' },
+        { key: 'standardDeviation', label: 'Standard Deviation', suffix: '%', neutral: true },
         ...(isEquityLike ? [{ key: 'beta', label: 'Beta', suffix: '' }] : []),
       ]},
       { group: 'Advanced Risk / Alpha', items: [
@@ -1397,10 +1415,11 @@ async function renderCompare() {
               const num = parseFloat(val);
               displayHtml = `<span class="${irColor(num)} tabular-nums">${num.toFixed(2)}</span>`;
             }
-          } else if (val === 'Insufficient Data') {
-            displayHtml = `<span class="text-outline text-sm tracking-normal font-normal">Insufficient Data</span>`;
-          } else if (val === null || val === undefined) {
-            displayHtml = `<span class="text-outline text-base">N/A</span>`;
+          } else if (val === 'Insufficient Data' || val === null || val === undefined) {
+            // Bug 7 fix: unify 'Insufficient Data' and null/undefined — both display as '—'
+            // 'Insufficient Data' (equity, no TRI) and null (debt, not applicable) mean
+            // the same thing to the user: metric not available for this fund.
+            displayHtml = `<span class="text-outline text-base">—</span>`;
           } else if (item.key === 'consistencyScore') {
             // Colour-coded score /10
             const score = parseFloat(val);
@@ -1420,6 +1439,11 @@ async function renderCompare() {
             const num = parseFloat(val);
             const color = num > 100 ? 'text-emerald-600' : 'text-amber-600';
             displayHtml = `<span class="${color}">${num.toFixed(2)}%</span>`;
+          } else if (item.neutral) {
+            // Bug 1 fix: neutral metrics (e.g. Standard Deviation) — higher is NOT better,
+            // so never color green. Use neutral text-on-surface regardless of value sign.
+            const num = parseFloat(val);
+            displayHtml = `<span class="text-on-surface">${num.toFixed(2)}${item.suffix}</span>`;
           } else {
             const num = parseFloat(val);
             const isPositive = num > 0;

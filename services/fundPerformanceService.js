@@ -1,5 +1,6 @@
 /**
- * fundPerformanceService.js
+
+const logger = require('../shared/logger'); * fundPerformanceService.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Fetches fund performance data from AMFI's Fund Performance API:
  *   POST https://www.amfiindia.com/gateway/pollingsebi/api/amfi/fundperformance
@@ -33,16 +34,16 @@ const path = require('path');
 const cron = require('node-cron');
 
 // ─── Paths ──────────────────────────────────────────────────────────────────
-
-const ROOT_DIR          = path.join(__dirname, '..');
-const AUM_JSON          = path.join(ROOT_DIR, 'aum-data.json');
-const AUM_JSON_TMP      = path.join(ROOT_DIR, 'aum-data.tmp.json');
-const BENCHMARK_JSON    = path.join(ROOT_DIR, 'benchmark-data.json');
-const BENCHMARK_JSON_TMP = path.join(ROOT_DIR, 'benchmark-data.tmp.json');
-const IR_JSON                = path.join(ROOT_DIR, 'ir-data.json');
-const IR_JSON_TMP            = path.join(ROOT_DIR, 'ir-data.tmp.json');
-const RISKOMETER_JSON        = path.join(ROOT_DIR, 'riskometer-data.json');
-const RISKOMETER_JSON_TMP    = path.join(ROOT_DIR, 'riskometer-data.tmp.json');
+// All persistent data files live in <project-root>/data/
+const DATA_DIR           = path.join(__dirname, '..', 'data');
+const AUM_JSON           = path.join(DATA_DIR, 'aum-data.json');
+const AUM_JSON_TMP       = path.join(DATA_DIR, 'aum-data.tmp.json');
+const BENCHMARK_JSON     = path.join(DATA_DIR, 'benchmark-data.json');
+const BENCHMARK_JSON_TMP = path.join(DATA_DIR, 'benchmark-data.tmp.json');
+const IR_JSON            = path.join(DATA_DIR, 'ir-data.json');
+const IR_JSON_TMP        = path.join(DATA_DIR, 'ir-data.tmp.json');
+const RISKOMETER_JSON    = path.join(DATA_DIR, 'riskometer-data.json');
+const RISKOMETER_JSON_TMP = path.join(DATA_DIR, 'riskometer-data.tmp.json');
 
 // ─── API Constants ───────────────────────────────────────────────────────────
 
@@ -99,14 +100,32 @@ let _riskometerCount  = 0;
  * e.g. "Mirae Asset Large Cap Fund - Direct Plan - Growth" → "mirae asset large cap fund"
  */
 function normaliseName(name) {
-  return (name || '')
-    .toLowerCase()
-    .replace(/\s*-\s*(direct|regular)\s*(plan)?/gi, '')
-    .replace(/\s*-\s*(growth|idcw|dividend|bonus|payout|reinvestment|income distribution)\s*(option)?/gi, '')
-    .replace(/\s*\(.*?\)/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  // Normalise & → and so AMFI AUM API names align with MFAPI NAV names
+  let s = (name || '').toLowerCase().replace(/\s*&\s*/g, ' and ');
+  s = s.replace(/\s*\(.*?\)/g, '');
+
+  // Primary split: on "- [option/plan keyword]" WITH a preceding dash
+  const splitRx = /\s*-\s*(direct|regular|retail|growth|idcw|dividend|bonus|payout|reinvest(?:ment)?|daily|weekly|fortnightly|monthly|quarterly|half.?yearly|annual|flexi|income\s+distribution)\b/i;
+  const splitIdx = s.search(splitRx);
+  if (splitIdx > 0) s = s.slice(0, splitIdx);
+
+  // Secondary split: "Direct Plan" / "Regular Plan" WITHOUT a dash
+  // e.g. "Fund Direct Plan Half Yearly IDCW Option"
+  const splitRx2 = /\s+(direct|regular|retail)\s+plan\b/i;
+  const splitIdx2 = s.search(splitRx2);
+  if (splitIdx2 > 0) s = s.slice(0, splitIdx2);
+
+  // Strip orphaned trailing option words
+  s = s.replace(/\b(growth|idcw|dividend|bonus|payout|reinvest(?:ment)?|daily|weekly|fortnightly|monthly|quarterly|annual|flexi)\s*$/gi, '');
+  // Strip orphaned trailing plan words
+  s = s.replace(/\b(direct|regular|retail)\s*(plan)?\s*$/gi, '');
+  // Strip trailing "Fund"
+  s = s.replace(/\bfund\s*$/gi, '');
+
+  return s.replace(/\s+/g, ' ').trim();
 }
+
+
 
 /**
  * Collapse all whitespace for compound-word comparison.
@@ -187,15 +206,15 @@ async function postJSON(url, body) {
       signal:  controller.signal,
     });
     if (!resp.ok) {
-      console.warn(`[FundPerf] HTTP ${resp.status} for ${url}`);
+      logger.warn(`[FundPerf] HTTP ${resp.status} for ${url}`);
       return null;
     }
     return await resp.json();
   } catch (err) {
     if (err.name === 'AbortError') {
-      console.warn(`[FundPerf] Timeout on ${url}`);
+      logger.warn(`[FundPerf] Timeout on ${url}`);
     } else {
-      console.warn(`[FundPerf] Error on ${url}: ${err.message}`);
+      logger.warn(`[FundPerf] Error on ${url}: ${err.message}`);
     }
     return null;
   } finally {
@@ -250,7 +269,7 @@ async function fetchAdaptiveFundData(maxFallbackDays = 14) {
   for (const catId of FUND_CATEGORIES) {
     const subCats = await getSubcategoriesForCategory(catId);
     if (!subCats || subCats.length === 0) {
-      console.log(`[FundPerf] category=${catId}: no subcategories found, skipping`);
+      logger.info(`[FundPerf] category=${catId}: no subcategories found, skipping`);
       continue;
     }
 
@@ -280,13 +299,13 @@ async function fetchAdaptiveFundData(maxFallbackDays = 14) {
       if (result && result.data && Array.isArray(result.data) && result.data.length > 0) {
         validDateStr = dateStr;
         firstSubCatRecords = result.data;
-        console.log(`[FundPerf] cat=${catId} latest date found: ${validDateStr} (tested subCat ${testSubCat.name})`);
+        logger.info(`[FundPerf] cat=${catId} latest date found: ${validDateStr} (tested subCat ${testSubCat.name})`);
         break;
       }
     }
 
     if (!validDateStr) {
-      console.warn(`[FundPerf] cat=${catId} yielded NO data for the last ${maxFallbackDays} days.`);
+      logger.warn(`[FundPerf] cat=${catId} yielded NO data for the last ${maxFallbackDays} days.`);
       continue;
     }
 
@@ -310,13 +329,13 @@ async function fetchAdaptiveFundData(maxFallbackDays = 14) {
       totalCalls++;
 
       if (result && result.data && Array.isArray(result.data) && result.data.length > 0) {
-        console.log(`[FundPerf] cat=${catId} subCat=${subCat.id}(${subCat.name}): ${result.data.length} funds on ${validDateStr}`);
+        logger.info(`[FundPerf] cat=${catId} subCat=${subCat.id}(${subCat.name}): ${result.data.length} funds on ${validDateStr}`);
         allRecords.push(...result.data);
       }
     }
   }
 
-  console.log(`[FundPerf] Adaptive fetch complete. API calls: ${totalCalls}, Total records: ${allRecords.length}, Dates used: ${Array.from(usedDates).join(', ')}`);
+  logger.info(`[FundPerf] Adaptive fetch complete. API calls: ${totalCalls}, Total records: ${allRecords.length}, Dates used: ${Array.from(usedDates).join(', ')}`);
   return { records: allRecords, usedDates: Array.from(usedDates) };
 }
 
@@ -329,7 +348,7 @@ async function fetchAdaptiveFundData(maxFallbackDays = 14) {
  * @returns {number} count of schemes with AUM data
  */
 async function syncAUM() {
-  console.log('[FundPerf] Starting adaptive AUM sync from AMFI Fund Performance API...');
+  logger.info('[FundPerf] Starting adaptive AUM sync from AMFI Fund Performance API...');
 
   const { records, usedDates } = await fetchAdaptiveFundData(14); // 14 days back to ensure we hit month-end for debt
 
@@ -402,7 +421,7 @@ async function syncAUM() {
   });
   fs.writeFileSync(AUM_JSON_TMP, aumPayload, 'utf-8');
   fs.renameSync(AUM_JSON_TMP, AUM_JSON);
-  console.log(`[FundPerf] AUM: wrote ${count} entries to aum-data.json (dates: ${usedDateStr})`);
+  logger.info(`[FundPerf] AUM: wrote ${count} entries to aum-data.json (dates: ${usedDateStr})`);
 
   // Atomic write — IR
   const irPayload = JSON.stringify({
@@ -414,7 +433,7 @@ async function syncAUM() {
   });
   fs.writeFileSync(IR_JSON_TMP, irPayload, 'utf-8');
   fs.renameSync(IR_JSON_TMP, IR_JSON);
-  console.log(`[FundPerf] IR: wrote ${irCount} entries to ir-data.json (dates: ${usedDateStr})`);
+  logger.info(`[FundPerf] IR: wrote ${irCount} entries to ir-data.json (dates: ${usedDateStr})`);
 
   // Atomic write — Riskometer
   const riskometerPayload = JSON.stringify({
@@ -426,7 +445,7 @@ async function syncAUM() {
   });
   fs.writeFileSync(RISKOMETER_JSON_TMP, riskometerPayload, 'utf-8');
   fs.renameSync(RISKOMETER_JSON_TMP, RISKOMETER_JSON);
-  console.log(`[FundPerf] Riskometer: wrote ${riskometerCount} entries to riskometer-data.json (dates: ${usedDateStr})`);
+  logger.info(`[FundPerf] Riskometer: wrote ${riskometerCount} entries to riskometer-data.json (dates: ${usedDateStr})`);
 
   // Load into memory
   _aumIndex        = aumMap;
@@ -450,7 +469,7 @@ async function syncAUM() {
  * @returns {number} count of unique scheme-benchmark mappings stored
  */
 async function syncBenchmarks() {
-  console.log('[FundPerf] Syncing per-fund benchmarks from AMFI...');
+  logger.info('[FundPerf] Syncing per-fund benchmarks from AMFI...');
 
   const { records } = await fetchAdaptiveFundData(14);
 
@@ -477,7 +496,7 @@ async function syncBenchmarks() {
   });
   fs.writeFileSync(BENCHMARK_JSON_TMP, payload, 'utf-8');
   fs.renameSync(BENCHMARK_JSON_TMP, BENCHMARK_JSON);
-  console.log(`[FundPerf] Benchmarks: wrote ${count} entries to benchmark-data.json`);
+  logger.info(`[FundPerf] Benchmarks: wrote ${count} entries to benchmark-data.json`);
 
   _benchmarkIndex = benchMap;
   _benchmarkCount = count;
@@ -501,20 +520,27 @@ async function initAUM() {
         const ageMs   = Date.now() - new Date(json.fetchedAt || 0).getTime();
         const ageDays = ageMs / (86400 * 1000);
         if (ageDays < AUM_MAX_AGE_DAYS) {
-          _aumIndex = json.data;
+          // Re-normalise cached keys through the CURRENT normaliseName so any
+          // improvement (e.g. & → and) takes effect immediately on restart.
+          const renormed = {};
+          for (const [oldKey, val] of Object.entries(json.data)) {
+            const newKey = normaliseName(oldKey);
+            renormed[newKey || oldKey] = val;
+          }
+          _aumIndex = renormed;
           _aumDate  = json.date || 'unknown';
           _aumCount = json.count || Object.keys(json.data).length;
-          console.log(`[FundPerf] AUM loaded from cache: ${_aumCount} entries (${ageDays.toFixed(1)}d old, date: ${_aumDate})`);
+          logger.info(`[FundPerf] AUM loaded from cache: ${_aumCount} entries (${ageDays.toFixed(1)}d old, date: ${_aumDate})`);
           aumCacheValid = true;
         } else {
-          console.log(`[FundPerf] AUM cache is ${ageDays.toFixed(1)}d old — refreshing...`);
+          logger.info(`[FundPerf] AUM cache is ${ageDays.toFixed(1)}d old — refreshing...`);
         }
       }
     } catch (err) {
-      console.warn(`[FundPerf] Could not read aum-data.json: ${err.message}`);
+      logger.warn(`[FundPerf] Could not read aum-data.json: ${err.message}`);
     }
   } else {
-    console.log('[FundPerf] aum-data.json not found — syncing...');
+    logger.info('[FundPerf] aum-data.json not found — syncing...');
   }
 
   // Also try to load IR from disk cache
@@ -529,14 +555,14 @@ async function initAUM() {
         if (ageDays < IR_MAX_AGE_DAYS) {
           _irIndex = json.data;
           _irCount = json.count || Object.keys(json.data).length;
-          console.log(`[FundPerf] IR loaded from cache: ${_irCount} entries (${ageDays.toFixed(1)}d old)`);
+          logger.info(`[FundPerf] IR loaded from cache: ${_irCount} entries (${ageDays.toFixed(1)}d old)`);
           irCacheValid = true;
         } else {
-          console.log(`[FundPerf] IR cache is ${ageDays.toFixed(1)}d old — will refresh via syncAUM`);
+          logger.info(`[FundPerf] IR cache is ${ageDays.toFixed(1)}d old — will refresh via syncAUM`);
         }
       }
     } catch (err) {
-      console.warn(`[FundPerf] Could not read ir-data.json: ${err.message}`);
+      logger.warn(`[FundPerf] Could not read ir-data.json: ${err.message}`);
     }
   }
 
@@ -552,14 +578,14 @@ async function initAUM() {
         if (ageDays < RISKOMETER_MAX_AGE_DAYS) {
           _riskometerIndex = json.data;
           _riskometerCount = json.count || Object.keys(json.data).length;
-          console.log(`[FundPerf] Riskometer loaded from cache: ${_riskometerCount} entries (${ageDays.toFixed(1)}d old)`);
+          logger.info(`[FundPerf] Riskometer loaded from cache: ${_riskometerCount} entries (${ageDays.toFixed(1)}d old)`);
           riskometerCacheValid = true;
         } else {
-          console.log(`[FundPerf] Riskometer cache is ${ageDays.toFixed(1)}d old — will refresh via syncAUM`);
+          logger.info(`[FundPerf] Riskometer cache is ${ageDays.toFixed(1)}d old — will refresh via syncAUM`);
         }
       }
     } catch (err) {
-      console.warn(`[FundPerf] Could not read riskometer-data.json: ${err.message}`);
+      logger.warn(`[FundPerf] Could not read riskometer-data.json: ${err.message}`);
     }
   }
 
@@ -570,7 +596,7 @@ async function initAUM() {
 
   if (aumCacheValid) {
     // AUM is fresh but IR or Riskometer is missing/stale — refresh via syncAUM
-    console.log('[FundPerf] IR/Riskometer data missing or stale — running syncAUM to refresh...');
+    logger.info('[FundPerf] IR/Riskometer data missing or stale — running syncAUM to refresh...');
   }
   await syncAUM();
 }
@@ -589,16 +615,16 @@ async function initBenchmarks() {
         if (ageDays < BENCHMARK_MAX_AGE_DAYS) {
           _benchmarkIndex = json.data;
           _benchmarkCount = json.count || Object.keys(json.data).length;
-          console.log(`[FundPerf] Benchmarks loaded from cache: ${_benchmarkCount} entries (${ageDays.toFixed(1)}d old)`);
+          logger.info(`[FundPerf] Benchmarks loaded from cache: ${_benchmarkCount} entries (${ageDays.toFixed(1)}d old)`);
           return;
         }
-        console.log(`[FundPerf] Benchmark cache is ${ageDays.toFixed(1)}d old — refreshing...`);
+        logger.info(`[FundPerf] Benchmark cache is ${ageDays.toFixed(1)}d old — refreshing...`);
       }
     } catch (err) {
-      console.warn(`[FundPerf] Could not read benchmark-data.json: ${err.message}`);
+      logger.warn(`[FundPerf] Could not read benchmark-data.json: ${err.message}`);
     }
   } else {
-    console.log('[FundPerf] benchmark-data.json not found — syncing...');
+    logger.info('[FundPerf] benchmark-data.json not found — syncing...');
   }
   await syncBenchmarks();
 }
@@ -611,12 +637,12 @@ async function initFundPerformance() {
   try {
     await initBenchmarks();
   } catch (err) {
-    console.error('[FundPerf] Benchmark init failed:', err.message);
+    logger.error('[FundPerf] Benchmark init failed:', err.message);
   }
   try {
     await initAUM();
   } catch (err) {
-    console.error('[FundPerf] AUM init failed:', err.message);
+    logger.error('[FundPerf] AUM init failed:', err.message);
   }
 }
 
@@ -710,21 +736,21 @@ function getIRByName(schemeName) {
  */
 function scheduleFundPerformanceCron(onSynced) {
   cron.schedule('30 9 * * *', async () => {
-    console.log('[FundPerf] Cron: daily AUM + Riskometer refresh triggered');
+    logger.info('[FundPerf] Cron: daily AUM + Riskometer refresh triggered');
     try {
       const count = await syncAUM();
-      console.log(`[FundPerf] Cron: AUM + Riskometer sync complete — ${count} schemes`);
+      logger.info(`[FundPerf] Cron: AUM + Riskometer sync complete — ${count} schemes`);
       if (typeof onSynced === 'function') {
         try { onSynced(count); } catch (cbErr) {
-          console.error('[FundPerf] Cron: onSynced callback error:', cbErr.message);
+          logger.error('[FundPerf] Cron: onSynced callback error:', cbErr.message);
         }
       }
     } catch (err) {
-      console.error('[FundPerf] Cron: AUM + Riskometer sync FAILED —', err.message);
+      logger.error('[FundPerf] Cron: AUM + Riskometer sync FAILED —', err.message);
     }
   }, { timezone: 'Asia/Kolkata' });
 
-  console.log('[FundPerf] Daily AUM + Riskometer cron scheduled (09:30 IST)');
+  logger.info('[FundPerf] Daily AUM + Riskometer cron scheduled (09:30 IST)');
 }
 
 // ─── Exports ─────────────────────────────────────────────────────────────────

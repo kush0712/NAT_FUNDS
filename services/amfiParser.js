@@ -1,5 +1,6 @@
 /**
- * AMFI NAV Parser
+
+const logger = require('../shared/logger'); * AMFI NAV Parser
  * Fetches and parses the AMFI NAV text file to extract fund data with categories.
  * Differentiates index funds by their tracked index.
  */
@@ -146,7 +147,7 @@ function getInitials(amcName) {
  * Returns: { funds: [...], categories: {...} }
  */
 async function parseAMFINav() {
-  console.log('[AMFI] Fetching NAV data...');
+  logger.info('[AMFI] Fetching NAV data...');
   const response = await fetch(AMFI_NAV_URL);
   const text = await response.text();
   const lines = text.split('\n');
@@ -249,7 +250,7 @@ async function parseAMFINav() {
     }
   }
 
-  console.log(`[AMFI] Parsed ${funds.length} total schemes`);
+  logger.info(`[AMFI] Parsed ${funds.length} total schemes`);
 
   // Build category summary
   const categories = {};

@@ -1,7 +1,8 @@
-const fs = require('fs');
+const fs   = require('fs');
+const path = require('path');
 
-const terData = JSON.parse(fs.readFileSync('ter-data.json', 'utf8'));
-const fundsPath = 'cache/processed_funds.json';
+const terData   = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'ter-data.json'), 'utf8'));
+const fundsPath = path.join(__dirname, '..', 'cache', 'processed_funds.json');
 const funds = fs.existsSync(fundsPath) ? JSON.parse(fs.readFileSync(fundsPath, 'utf8')).funds : [];
 
 const _terIndex = {};
