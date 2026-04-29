@@ -4,6 +4,7 @@ server.log
 output*.txt
 cache/
 .stitch/
+stitch-skills/
 mcp_config.json
 .env
 
