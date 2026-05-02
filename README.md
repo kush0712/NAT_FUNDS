@@ -104,8 +104,8 @@ server.js                    ← Entry point: Express setup, security, route mou
 | mfapi.in | Per-scheme historical NAV (full history) | Per-scheme disk cache (24h TTL) |
 | AMFI Fund Performance API | AUM (₹ Cr), fund→benchmark map, AMFI IR (1Y/3Y/5Y/10Y), SEBI Riskometer | Daily cron at **09:30 IST** + `/admin/sync-aum` |
 | AMFI TER XLSX | Total Expense Ratio per scheme | Daily cron at **09:00 IST** + `/admin/sync-ter` |
-| NSE / BSE Indices API | Benchmark TRI history (used for Beta, Alpha, IR, Capture) | On demand + `/admin/sync-tri` |
-| RBI 91-day T-bill | Risk-free rate for Sharpe / Sortino / Jensen's Alpha | Weekly in-memory cache |
+| NSE / BSE Indices API | Benchmark TRI history (used for Beta, Alpha, IR, Capture) | Daily cron at **09:31 IST** + `/admin/sync-tri` |
+| CCIL India (91-day T-bill YTM) | Risk-free rate for Sharpe / Sortino / Jensen's Alpha | 24-hour disk cache; refreshed daily at boot |
 
 > **Benchmark cache TTL**: `benchmark-data.json` has a 90-day cache TTL (benchmarks are semi-permanent per SEBI mandate). The `/admin/sync-aum` endpoint refreshes AUM + AMFI IR + Riskometer daily; benchmarks are re-synced only when the file is >90 days old.
 
@@ -269,4 +269,4 @@ All calculations live in `services/metricsCalculator.js` as pure functions.
 - All financial calculations are read-only — no metric computation mutates external state.
 - The `cache/` directory is git-ignored. On a fresh clone it is empty; it fills automatically as NAV data is fetched during the first boot and is fully rebuilt within 24 hours.
 - `data/*.json` files can optionally be git-ignored (see commented lines in `.gitignore`) if you prefer not to commit the JSON stores. The application will re-sync them from AMFI/NSE/BSE on first boot.
-- Rate limiting is enforced at the Express layer: **200 requests per 15 minutes per IP** (configurable in `server.js`).
+- Rate limiting is enforced at the Express layer: **200 requests per minute per IP** (configurable in `server.js`).
