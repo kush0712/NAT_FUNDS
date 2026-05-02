@@ -241,7 +241,7 @@ All calculations live in `services/metricsCalculator.js` as pure functions.
 | **Beta** | Covariance/variance of 36 aligned monthly returns (fund vs TRI); requires real TRI data |
 | **Jensen's Alpha** | `AnnFundReturn − [Rf + Beta × (AnnBenchReturn − Rf)]`; geometric annualisation |
 | **Max Drawdown** | Two-pass O(n) scan; returns peak date, trough date, and recovery date |
-| **Calmar Ratio** | `3Y CAGR (%) / |Max Drawdown (%)|`; both inputs in percentage units (e.g. 12.5 for 12.5%); returns `null` if 3Y CAGR is unavailable or Max Drawdown is zero; rounded to 2 decimal places |
+| **Calmar Ratio** | `3Y CAGR (%) / abs(Max Drawdown (%))`; both inputs in percentage units (e.g. 12.5 for 12.5%); returns `null` if 3Y CAGR is unavailable or Max Drawdown is zero; rounded to 2 decimal places |
 | **Information Ratio** | `(AnnFundReturn − AnnBenchReturn) / Tracking Error`; requires ≥36 aligned months |
 | **R²** | Pearson correlation² between fund and benchmark monthly returns (0–100 scale) |
 | **Upside/Downside Capture** | Morningstar method; ≥10 up-months and ≥6 down-months required |
