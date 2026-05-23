@@ -13,7 +13,7 @@ const router  = express.Router();
 
 const state = require('../shared/appState');
 
-const { fetchSchemeNav }                     = require('../services/dataFetcher');
+const { fetchSchemeNav, isNavCacheFresh }            = require('../services/dataFetcher');
 const { calculateAllMetrics, parseNavDate, computeConsistencyScoreForFund } = require('../services/metricsCalculator');
 const { getTRIHistory }                      = require('../services/triService');
 
@@ -112,11 +112,13 @@ router.get('/funds', async (req, res) => {
   const start    = (pageNum - 1) * pageSize;
   const paginated = funds.slice(start, start + pageSize);
 
-  // Lazy-evaluate metrics for paginated items if missing
+  // Lazy-evaluate metrics for paginated items if missing — skip live fetch if
+  // mfapi.in is slow; use in-memory data which already has patched NAV from AMFI.
   const evalPromises = paginated.map(async (fund) => {
     if (fund.cagr1y !== null || typeof fund.standardDeviation === 'string' || typeof fund.standardDeviation === 'number') {
-      return;
+      return; // Already computed
     }
+    if (!isNavCacheFresh(fund.schemeCode)) return; // Stale cache + slow API — skip, BG refresh will handle it
     try {
       const navData = await fetchSchemeNav(fund.schemeCode);
       if (navData && navData.data && navData.data.length > 30) {
@@ -154,47 +156,51 @@ router.get('/fund/:schemeCode', async (req, res) => {
     return res.status(404).json({ error: 'Fund not found' });
   }
 
-  try {
-    const navData = await fetchSchemeNav(fund.schemeCode);
-    if (navData && navData.data && navData.data.length > 0) {
-      // Sync with latest history date if newer than cached
-      const latestMfDateStr  = navData.data[0].date;
-      const currentFundDate  = parseNavDate(fund.date);
-      const newMfDate        = parseNavDate(latestMfDateStr);
-      if (newMfDate && currentFundDate && newMfDate > currentFundDate) {
-        fund.nav  = parseFloat(navData.data[0].nav);
-        fund.date = latestMfDateStr;
-      }
-
-      const needsFullCalc =
-        (fund.cagr1y === null && fund.cagr3y === null) ||
-        (navData.data.length > 30 && fund.maxDrawdown === undefined) ||
-        (fund.cagr1y !== null && (
-          fund.standardDeviation === 'Insufficient Data' ||
-          fund.sharpeRatio       === 'Insufficient Data'
-        )) ||
-        fund.cagrSinceInception === undefined ||
-        (fund._needsTRIRecompute === true && state.fundBenchmarkTRIs[fund.schemeCode]);
-
-      if (needsFullCalc && navData.data.length > 30) {
-        const fundTRI = state.fundBenchmarkTRIs[fund.schemeCode] || null;
-        const metrics = calculateAllMetrics(navData.data, fund.type, fund.optionType || 'Growth', fundTRI);
-        Object.assign(fund, metrics);
-        delete fund._needsTRIRecompute;
-
-        const peers = state.allFunds.filter(f => f.subCategory === fund.subCategory);
-        if (peers.length > 0) {
-          fund.consistencyScore = computeConsistencyScoreForFund(fund, peers);
+  // Only make a live mfapi.in call if the per-scheme cache is actually fresh.
+  // If stale, serve from in-memory state (which has today's NAV from AMFI bulk patch).
+  // This prevents 6-18s hangs when mfapi.in is slow or throttled.
+  if (isNavCacheFresh(fund.schemeCode)) {
+    try {
+      const navData = await fetchSchemeNav(fund.schemeCode);
+      if (navData && navData.data && navData.data.length > 0) {
+        const latestMfDateStr  = navData.data[0].date;
+        const currentFundDate  = parseNavDate(fund.date);
+        const newMfDate        = parseNavDate(latestMfDateStr);
+        if (newMfDate && currentFundDate && newMfDate > currentFundDate) {
+          fund.nav  = parseFloat(navData.data[0].nav);
+          fund.date = latestMfDateStr;
         }
 
-        if (navData.meta) {
-          if (navData.meta.fund_house)     fund.amc          = navData.meta.fund_house;
-          if (navData.meta.scheme_category) fund.schemeCategory = navData.meta.scheme_category;
+        const needsFullCalc =
+          (fund.cagr1y === null && fund.cagr3y === null) ||
+          (navData.data.length > 30 && fund.maxDrawdown === undefined) ||
+          (fund.cagr1y !== null && (
+            fund.standardDeviation === 'Insufficient Data' ||
+            fund.sharpeRatio       === 'Insufficient Data'
+          )) ||
+          fund.cagrSinceInception === undefined ||
+          (fund._needsTRIRecompute === true && state.fundBenchmarkTRIs[fund.schemeCode]);
+
+        if (needsFullCalc && navData.data.length > 30) {
+          const fundTRI = state.fundBenchmarkTRIs[fund.schemeCode] || null;
+          const metrics = calculateAllMetrics(navData.data, fund.type, fund.optionType || 'Growth', fundTRI);
+          Object.assign(fund, metrics);
+          delete fund._needsTRIRecompute;
+
+          const peers = state.allFunds.filter(f => f.subCategory === fund.subCategory);
+          if (peers.length > 0) {
+            fund.consistencyScore = computeConsistencyScoreForFund(fund, peers);
+          }
+
+          if (navData.meta) {
+            if (navData.meta.fund_house)     fund.amc          = navData.meta.fund_house;
+            if (navData.meta.scheme_category) fund.schemeCategory = navData.meta.scheme_category;
+          }
         }
       }
+    } catch (err) {
+      logger.error(`Error processing live data for ${fund.schemeCode}`, err);
     }
-  } catch (err) {
-    logger.error(`Error processing live data for ${fund.schemeCode}`, err);
   }
 
   res.json(fund);
@@ -211,62 +217,78 @@ router.get('/fund/:schemeCode/nav-history', async (req, res) => {
     return res.status(404).json({ error: 'Fund not found' });
   }
 
+  // Same cache-freshness guard for NAV history chart
+  if (!isNavCacheFresh(fund.schemeCode)) {
+    // Serve NAV history from the stale-but-valid nav_*.json file on disk if available,
+    // otherwise return empty so the chart gracefully shows nothing instead of hanging.
+    try {
+      const navData = await fetchSchemeNav(fund.schemeCode); // reads from disk only (stale OK for chart)
+      if (!navData || !navData.data || navData.data.length === 0) return res.json({ data: [] });
+      // Fall through to chart rendering below with disk data
+      return buildNavHistoryResponse(req, res, navData);
+    } catch (err) {
+      return res.json({ data: [] });
+    }
+  }
+
   try {
     const navData = await fetchSchemeNav(fund.schemeCode);
     if (!navData || !navData.data || navData.data.length === 0) {
       return res.json({ data: [] });
     }
-
-    const period      = req.query.period || '5y';
-    const periodYears = period === '1y' ? 1 : period === '3y' ? 3 : period === 'max' ? 100 : 5;
-
-    const now    = new Date();
-    const cutoff = new Date(now);
-    cutoff.setFullYear(cutoff.getFullYear() - periodYears);
-
-    const parseDate = (dateStr) => {
-      if (!dateStr) return null;
-      const parts = dateStr.split('-');
-      if (parts.length !== 3) return null;
-      const day = parseInt(parts[0]);
-      let month;
-      if (isNaN(parseInt(parts[1]))) {
-        const months = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
-        month = months[parts[1]];
-        if (month === undefined) return null;
-      } else {
-        month = parseInt(parts[1]) - 1;
-      }
-      return new Date(parseInt(parts[2]), month, day);
-    };
-
-    const parsed = navData.data
-      .map(d => ({ date: parseDate(d.date), nav: parseFloat(d.nav), dateStr: d.date }))
-      .filter(d => d.date && !isNaN(d.nav) && d.nav > 0 && d.date >= cutoff)
-      .sort((a, b) => a.date - b.date);
-
-    const maxPoints = 200;
-    let sampled;
-    if (parsed.length <= maxPoints) {
-      sampled = parsed;
-    } else {
-      const step = Math.floor(parsed.length / maxPoints);
-      sampled = [];
-      for (let i = 0; i < parsed.length; i += step) sampled.push(parsed[i]);
-      if (sampled[sampled.length - 1] !== parsed[parsed.length - 1]) {
-        sampled.push(parsed[parsed.length - 1]);
-      }
-    }
-
-    res.json({
-      data: sampled.map(d => ({ date: d.date.toISOString().split('T')[0], nav: d.nav })),
-      meta: navData.meta || {},
-    });
+    return buildNavHistoryResponse(req, res, navData);
   } catch (err) {
     logger.error(`Error fetching nav history for ${fund.schemeCode}`, err);
     res.status(500).json({ error: 'Failed to fetch NAV history' });
   }
 });
+
+// Helper: build the sampled NAV chart response from a navData object
+function buildNavHistoryResponse(req, res, navData) {
+  const period      = req.query.period || '5y';
+  const periodYears = period === '1y' ? 1 : period === '3y' ? 3 : period === 'max' ? 100 : 5;
+  const now    = new Date();
+  const cutoff = new Date(now);
+  cutoff.setFullYear(cutoff.getFullYear() - periodYears);
+
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null;
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return null;
+    const day = parseInt(parts[0]);
+    let month;
+    if (isNaN(parseInt(parts[1]))) {
+      const months = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+      month = months[parts[1]];
+      if (month === undefined) return null;
+    } else {
+      month = parseInt(parts[1]) - 1;
+    }
+    return new Date(parseInt(parts[2]), month, day);
+  };
+
+  const parsed = navData.data
+    .map(d => ({ date: parseDate(d.date), nav: parseFloat(d.nav) }))
+    .filter(d => d.date && !isNaN(d.nav) && d.nav > 0 && d.date >= cutoff)
+    .sort((a, b) => a.date - b.date);
+
+  const maxPoints = 200;
+  let sampled;
+  if (parsed.length <= maxPoints) {
+    sampled = parsed;
+  } else {
+    const step = Math.floor(parsed.length / maxPoints);
+    sampled = [];
+    for (let i = 0; i < parsed.length; i += step) sampled.push(parsed[i]);
+    if (sampled[sampled.length - 1] !== parsed[parsed.length - 1]) {
+      sampled.push(parsed[parsed.length - 1]);
+    }
+  }
+  return res.json({
+    data: sampled.map(d => ({ date: d.date.toISOString().split('T')[0], nav: d.nav })),
+    meta: navData.meta || {},
+  });
+}
 
 // ─── GET /api/compare ─────────────────────────────────────────────────────────
 /**
@@ -285,6 +307,8 @@ router.get('/compare', async (req, res) => {
   }
 
   for (const fund of funds) {
+    // Only fetch live NAV if the per-scheme cache file is fresh (< 24h)
+    if (!isNavCacheFresh(fund.schemeCode)) continue;
     try {
       const navData = await fetchSchemeNav(fund.schemeCode);
       if (navData && navData.data && navData.data.length > 0) {

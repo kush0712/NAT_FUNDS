@@ -1,6 +1,5 @@
 /**
-
-const logger = require('../shared/logger'); * riskFreeRate.js
+ * riskFreeRate.js
  * Fetches the current 91-day Treasury Bill yield from RBI's public data API.
  * Used as the risk-free rate for Sharpe Ratio calculations.
  *
@@ -8,6 +7,7 @@ const logger = require('../shared/logger'); * riskFreeRate.js
  * Fallback: use last successfully fetched rate. Never falls back to a hardcoded constant.
  */
 
+const logger = require('../shared/logger');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');

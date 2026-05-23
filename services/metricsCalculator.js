@@ -1,6 +1,5 @@
 /**
-
-const logger = require('../shared/logger'); * Metrics Calculator
+ * Metrics Calculator
  * Pure functions for calculating financial metrics from NAV history.
  *
  * Methodological standards (all fixes applied):
@@ -10,6 +9,8 @@ const logger = require('../shared/logger'); * Metrics Calculator
  *  #4 — Risk level: within-category percentile ranking (static fallback kept)
  *  #5 — Beat-benchmark: strict 3-day date alignment, dropped windows logged
  */
+
+const logger = require('../shared/logger');
 
 const { getMonthlyRiskFreeRate, getRiskFreeRateMeta } = require('./riskFreeRate');
 

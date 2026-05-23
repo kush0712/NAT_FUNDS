@@ -1,9 +1,10 @@
 /**
-
-const logger = require('../shared/logger'); * AMFI NAV Parser
+ * AMFI NAV Parser
  * Fetches and parses the AMFI NAV text file to extract fund data with categories.
  * Differentiates index funds by their tracked index.
  */
+
+const logger = require('../shared/logger');
 
 const AMFI_NAV_URL = 'https://www.amfiindia.com/spages/NAVAll.txt';
 

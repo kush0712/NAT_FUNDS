@@ -14,11 +14,11 @@ const logger = require('../shared/logger');
 
 const { parseAMFINav, selectTopFunds }                                       = require('../services/amfiParser');
 const { fetchSchemeNav, batchFetchNavs, saveProcessedData, loadProcessedData,
-        fetchSchemeNav: fetchSchemeNavAlias }                                 = require('../services/dataFetcher');
+        readNavFromDisk }                                                     = require('../services/dataFetcher');
 const { calculateAllMetrics, parseNavDate, recomputeRiskLevels, recomputeConsistencyScores } = require('../services/metricsCalculator');
 const { initTER, syncTER, getTERCount, scheduleTERCron }                     = require('../services/terService');
 const { initFundPerformance, syncAUM, getBenchmarkByName, getAUMByName, getRiskometerByName,
-        getBenchmarkCount, getIRCount, getRiskometerCount, scheduleAUMCron,
+        getBenchmarkCount, getIRCount, getRiskometerCount, scheduleFundPerformanceCron,
         getAUMCount }                                                         = require('../services/fundPerformanceService');
 const { initTRI, syncTRI, getTRIHistory, getTRICount, loadTRI, saveTRI,
         setTRIBenchmarksForCron, scheduleTRICron }                           = require('../services/triService');
@@ -85,7 +85,7 @@ async function boot() {
 
   // Schedule daily AUM + Riskometer cron — callback re-applies fresh data to
   // the in-memory fund list so consumers get updated values without a restart.
-  scheduleAUMCron(() => {
+  scheduleFundPerformanceCron(() => {
     let riskometerPatched = 0;
     for (const f of state.allFunds) {
       const aum = getAUMByName(f.schemeName);
@@ -102,8 +102,9 @@ async function boot() {
 
   logger.info(`[Boot] Fund Performance: AUM=${getAUMCount()} schemes, Benchmarks=${getBenchmarkCount()} funds, IR=${getIRCount()} funds, Riskometer=${getRiskometerCount()} funds`);
 
-  // ── Check for cached processed data (24h TTL) ─────────────────────────────
-  const cachedData = loadProcessedData(24);
+  // ── Check for cached processed data (market-aware TTL) ───────────────────
+  // Fresh if saved after the last AMFI NAV publish date (6 PM IST on last business day).
+  const cachedData = loadProcessedData();
   if (cachedData) {
     state.allFunds       = cachedData.funds;
     state.categorySummary = cachedData.categories;
@@ -143,20 +144,19 @@ async function boot() {
 
     /**
      * Recompute beta/alpha for all equity funds that now have TRI data.
-     * Reads NAV from the per-scheme disk cache — no network calls.
+     * DISK-ONLY: reads nav_*.json from disk regardless of age. No network calls.
      */
     async function recomputeTRIMetrics() {
-      // fetchSchemeNav is imported at the top of this file (used as fetchSchemeNav below)
       let recomputed = 0;
       const fundsNeedingRecompute = state.allFunds.filter(f =>
         (f.beta === 'Insufficient Data' || f.beta === null) &&
         ['Equity', 'Index', 'ETF'].includes(f.type) &&
         state.fundBenchmarkTRIs[f.schemeCode]
       );
-      logger.info(`[Boot] Recomputing TRI metrics for ${fundsNeedingRecompute.length} equity funds...`);
+      logger.info(`[Boot] Recomputing TRI metrics for ${fundsNeedingRecompute.length} equity funds from disk cache (no network)...`);
       for (const fund of fundsNeedingRecompute) {
         try {
-          const navData = await fetchSchemeNav(fund.schemeCode);
+          const navData = readNavFromDisk(fund.schemeCode);
           if (!navData || !navData.data || navData.data.length <= 30) continue;
           const fundTRI = state.fundBenchmarkTRIs[fund.schemeCode];
           const metrics = calculateAllMetrics(navData.data, fund.type, fund.optionType || 'Growth', fundTRI);
@@ -183,10 +183,10 @@ async function boot() {
      * Recompute stale volatility metrics (Sharpe, Sortino, StdDev) for funds
      * where the disk cache still contains 'Insufficient Data' but the fund has
      * a valid cagr1y, or where the new cagrSinceInception field is missing.
-     * No network calls — reads only from per-scheme disk cache.
+     * DISK-ONLY: reads nav_*.json from disk regardless of age. No network calls.
+     * Skips funds whose cache file doesn't exist on disk yet.
      */
     async function recomputeStaleVolatilityMetrics() {
-      // fetchSchemeNav is imported at the top of this file (used as fetchSchemeNav below)
       const stale = state.allFunds.filter(f =>
         (f.cagr1y !== null && (
           f.standardDeviation === 'Insufficient Data' ||
@@ -200,12 +200,14 @@ async function boot() {
         return;
       }
 
-      logger.info(`[Boot] Recomputing volatility metrics for ${stale.length} stale funds (background)...`);
+      logger.info(`[Boot] Recomputing volatility metrics for ${stale.length} stale funds from disk cache (no network)...`);
       let recomputed = 0;
+      let skipped = 0;
       for (const fund of stale) {
         try {
-          const navData = await fetchSchemeNav(fund.schemeCode);
-          if (!navData || !navData.data || navData.data.length <= 30) continue;
+          // DISK-ONLY: read nav file regardless of age, skip if file doesn't exist
+          const navData = readNavFromDisk(fund.schemeCode);
+          if (!navData || !navData.data || navData.data.length <= 30) { skipped++; continue; }
           const fundTRI = state.fundBenchmarkTRIs[fund.schemeCode] || null;
           const metrics = calculateAllMetrics(navData.data, fund.type, fund.optionType || 'Growth', fundTRI);
           Object.assign(fund, metrics);
@@ -222,7 +224,9 @@ async function boot() {
         recomputeRiskLevels(state.allFunds);
         recomputeConsistencyScores(state.allFunds);
         saveProcessedData(state.allFunds, state.categorySummary);
-        logger.info(`[Boot] Volatility recompute complete: ${recomputed}/${stale.length} funds updated and saved.`);
+        logger.info(`[Boot] Volatility recompute complete: ${recomputed}/${stale.length} updated from disk (${skipped} skipped — no disk cache).`);
+      } else {
+        logger.info(`[Boot] Volatility recompute: all ${stale.length} stale funds have no disk cache yet. Will update after background refresh.`);
       }
     }
 
@@ -262,6 +266,108 @@ async function boot() {
   state.loadingProgress = { phase: 'parsing', completed: 0, total: 0, cached: 0 };
   const { funds: rawFunds, categories } = await parseAMFINav();
   state.categorySummary = categories;
+
+  // ── Stale-cache fast-path (24h < age ≤ 30 days) ───────────────────────────
+  // If processed_funds.json exists but is between 24h and 30 days old, serve it
+  // immediately so the UI is usable while the full refresh runs in the background.
+  // NAV prices are updated instantly from the AMFI bulk file already in memory.
+  const staleData = loadProcessedData(720); // 720h = 30 days absolute max
+  if (staleData) {
+    logger.info(`[Boot] Stale cache found — serving immediately while refreshing in background.`);
+    state.allFunds       = staleData.funds;
+    state.categorySummary = staleData.categories;
+
+    // Patch fund.nav / fund.date from AMFI bulk data (no extra network calls).
+    // rawFunds already contains today's NAV for all 9,145 schemes.
+    const amfiNavMap = {};
+    for (const f of rawFunds) amfiNavMap[f.schemeCode] = f;
+    let navPatched = 0;
+    for (const fund of state.allFunds) {
+      const fresh = amfiNavMap[fund.schemeCode];
+      if (fresh && fresh.nav) {
+        fund.nav  = fresh.nav;
+        fund.date = fresh.date;
+        navPatched++;
+      }
+      applyTER(fund);
+      applyAUMandBenchmark(fund);
+      applyIR(fund);
+      applyRiskometer(fund);
+    }
+    state.fundsByCode = {};
+    for (const f of state.allFunds) state.fundsByCode[f.schemeCode] = f;
+    logger.info(`[Boot] NAV prices updated from AMFI bulk data: ${navPatched} funds patched.`);
+
+    const benchmarkNames2 = [...new Set(state.allFunds.map(f => f.benchmarkName).filter(Boolean))];
+    setTRIBenchmarksForCron(benchmarkNames2);
+    scheduleTRICron();
+    loadTRI();
+    for (const f of state.allFunds) {
+      if (f.benchmarkName) {
+        const tri = getTRIHistory(f.benchmarkName);
+        if (tri) state.fundBenchmarkTRIs[f.schemeCode] = tri;
+      }
+    }
+
+    state.dataReady = true;
+    state.loadingProgress = { phase: 'complete', completed: state.allFunds.length, total: state.allFunds.length, cached: state.allFunds.length };
+    logger.info(`[Boot] ✓ Ready! Serving ${state.allFunds.length} funds. Full metric refresh running in background...`);
+    printBootReconciliationReport(state.allFunds);
+
+    // Background: full metric refresh (NAV history + Sharpe/Beta/CAGR recompute)
+    (async () => {
+      try {
+        logger.info('[Boot:BG] Starting background metric refresh for all schemes...');
+        const bgSelected = selectTopFunds(rawFunds, 3000);
+        const bgSchemeCodes = bgSelected.map(f => f.schemeCode);
+        const bgNavMap = await batchFetchNavs(bgSchemeCodes, (completed, total, cached) => {
+          if (completed % 200 === 0 || completed === total) {
+            logger.info(`[Boot:BG] NAV fetch progress: ${completed}/${total} (${cached} from cache)`);
+          }
+        }, 200);
+
+        // Re-apply enrichment to the in-memory allFunds using bgNavMap
+        for (const fund of state.allFunds) {
+          const navData = bgNavMap[fund.schemeCode];
+          if (!navData || !navData.data || navData.data.length <= 30) continue;
+          const fundTRI = fund.benchmarkName ? getTRIHistory(fund.benchmarkName) : null;
+          const metrics = calculateAllMetrics(
+            navData.data, fund.type, fund.optionType || 'Growth', fundTRI
+          );
+          Object.assign(fund, metrics);
+          if (fund._amfiRiskometer) {
+            const officialRisk = getRiskometerByName(fund.schemeName);
+            if (officialRisk) fund.riskLevel = officialRisk;
+          }
+          if (navData.meta) {
+            if (navData.meta.fund_house) fund.amc = navData.meta.fund_house;
+            if (navData.meta.scheme_category) fund.schemeCategory = navData.meta.scheme_category;
+          }
+          if (navData.data.length > 0) {
+            const latestNav = parseFloat(navData.data[0].nav);
+            const latestDate = navData.data[0].date;
+            const newDate = parseNavDate(latestDate);
+            const curDate = parseNavDate(fund.date);
+            if (newDate && (!curDate || newDate >= curDate)) {
+              fund.nav  = latestNav;
+              fund.date = latestDate;
+            }
+          }
+        }
+        recomputeRiskLevels(state.allFunds);
+        recomputeConsistencyScores(state.allFunds);
+        state.fundsByCode = {};
+        for (const f of state.allFunds) state.fundsByCode[f.schemeCode] = f;
+        saveProcessedData(state.allFunds, state.categorySummary);
+        logger.info(`[Boot:BG] ✓ Background metric refresh complete. Cache updated.`);
+      } catch (err) {
+        logger.error('[Boot:BG] Background refresh error:', err.message);
+      }
+    })();
+    return;
+  }
+
+  // ── No usable cache at all — full synchronous boot ────────────────────────
 
   // ── Phase 2: Make ALL funds available instantly ───────────────────────────
   state.allFunds = rawFunds;

@@ -1,9 +1,10 @@
 /**
-
-const logger = require('../shared/logger'); * Data Fetcher
+ * Data Fetcher
  * Fetches historical NAV from mfapi.in, manages disk cache,
  * provides TER lookup, and fetches AUM from AMFI reports.
  */
+
+const logger = require('../shared/logger');
 
 const fs = require('fs');
 const path = require('path');
@@ -33,6 +34,8 @@ function getCachePath(schemeCode) {
 
 /**
  * Check if cached data is fresh (within maxAgeMs, default 24 hours)
+ * Per-scheme NAV files are refreshed daily to keep NAV current.
+ * On market holidays the previous day's cache is used automatically.
  */
 function isCacheFresh(cachePath, maxAgeMs = 24 * 60 * 60 * 1000) {
   try {
@@ -42,6 +45,15 @@ function isCacheFresh(cachePath, maxAgeMs = 24 * 60 * 60 * 1000) {
   } catch {
     return false;
   }
+}
+
+/**
+ * Public helper: returns true if the per-scheme nav_*.json file is < 24h old.
+ * Routes use this to skip live mfapi.in calls when the cache is stale, preventing
+ * UI hangs when the external API is slow or throttled.
+ */
+function isNavCacheFresh(schemeCode) {
+  return isCacheFresh(getCachePath(schemeCode));
 }
 
 function readCache(schemeCode) {
@@ -55,6 +67,22 @@ function readCache(schemeCode) {
     }
   }
   return null;
+}
+
+/**
+ * Read nav_*.json from disk regardless of age (no freshness check, no network).
+ * Returns null if the file doesn't exist yet.
+ * Used by background recompute jobs that must never trigger live API calls.
+ */
+function readNavFromDisk(schemeCode) {
+  const cachePath = getCachePath(schemeCode);
+  try {
+    if (!fs.existsSync(cachePath)) return null;
+    const data = fs.readFileSync(cachePath, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    return null;
+  }
 }
 
 function writeCache(schemeCode, data) {
@@ -76,12 +104,14 @@ function sleep(ms) {
 /**
  * Fetch with exponential backoff retry (handles 429, timeouts, transient errors)
  */
-async function fetchWithRetry(url, maxRetries = 3, baseDelayMs = 300) {
+async function fetchWithRetry(url, maxRetries = 2, baseDelayMs = 300) {
   let lastError = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      // 6s timeout: mfapi.in responds in < 2s when healthy. The old 15s timeout
+      // was being bypassed by OS-level TCP hangs (~75s), causing batches to stall.
+      const timeout = setTimeout(() => controller.abort(), 6000);
       const resp = await fetch(url, { signal: controller.signal });
       clearTimeout(timeout);
 
@@ -135,12 +165,12 @@ async function fetchSchemeNav(schemeCode) {
 /**
  * Batch fetch historical NAV for multiple schemes with rate limiting
  */
-async function batchFetchNavs(schemeCodes, progressCb = null, delayMs = 100) {
+async function batchFetchNavs(schemeCodes, progressCb = null, delayMs = 50) {
   const results = {};
   const total = schemeCodes.length;
   let completed = 0;
   let cached = 0;
-  const CONCURRENCY = 10; // fetch 10 NAVs in parallel
+  const CONCURRENCY = 25; // fetch 25 NAVs in parallel
 
   logger.info(`[Fetcher] Starting batch fetch for ${total} schemes (concurrency=${CONCURRENCY})...`);
 
@@ -417,20 +447,73 @@ function saveProcessedData(funds, categories) {
 }
 
 /**
- * Load processed fund data from disk (if within maxAgeHours)
+ * Returns the most recent Date (IST midnight) on which AMFI would have published
+ * NAV data. Rules:
+ *   - AMFI publishes NAV after market close. We use 6 PM IST as a safe cutoff.
+ *   - If current IST time >= 18:00 → today's NAV is published → last publish = today
+ *   - If current IST time < 18:00  → today's NAV isn't out yet → last publish = prev business day
+ *   - Weekends have no NAV → roll back to last Friday
+ *
+ * The cache is stale if it was saved BEFORE this date.
  */
-function loadProcessedData(maxAgeHours = 24) {
+function getLastNavPublishDate() {
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const nowIST = new Date(Date.now() + IST_OFFSET_MS);
+  const hourIST = nowIST.getUTCHours();
+  const NAV_PUBLISH_HOUR = 18; // 6 PM IST — conservative cutoff
+
+  // Start from today in IST
+  let candidate = new Date(nowIST);
+  candidate.setUTCHours(0, 0, 0, 0);
+
+  // If NAV hasn't been published yet today, step back one day
+  if (hourIST < NAV_PUBLISH_HOUR) {
+    candidate.setUTCDate(candidate.getUTCDate() - 1);
+  }
+
+  // Roll back over weekends (Sunday=0, Saturday=6)
+  while (candidate.getUTCDay() === 0 || candidate.getUTCDay() === 6) {
+    candidate.setUTCDate(candidate.getUTCDate() - 1);
+  }
+
+  return candidate; // UTC midnight of the last business day with published NAV
+}
+
+/**
+ * Load processed fund data from disk.
+ * Uses market-aware staleness check instead of a simple hour TTL:
+ *   - Fresh if saved on or after the last NAV publish date (business day, after 6 PM IST)
+ *   - Stale if saved before — triggers a background refresh
+ *   - Absolute max of 30 days regardless (passed via maxAgeHours for the stale-cache path)
+ */
+function loadProcessedData(maxAgeHours = null) {
   const dataPath = path.join(CACHE_DIR, 'processed_funds.json');
   try {
     if (!fs.existsSync(dataPath)) return null;
     const raw = fs.readFileSync(dataPath, 'utf-8');
     const data = JSON.parse(raw);
-    const ageMs = Date.now() - (data.timestamp || 0);
-    if (ageMs < maxAgeHours * 60 * 60 * 1000) {
-      logger.info(`[Cache] Loaded ${data.funds.length} processed funds from disk`);
+    const savedAt = data.timestamp || 0;
+    const ageMs   = Date.now() - savedAt;
+    const ageHours = (ageMs / 3600000).toFixed(1);
+
+    // Absolute maximum — always re-fetch if cache is older than maxAgeHours
+    if (maxAgeHours !== null && ageMs >= maxAgeHours * 60 * 60 * 1000) {
+      logger.info(`[Cache] Processed data ${ageHours}h old — exceeds ${maxAgeHours}h absolute max, will refresh`);
+      return null;
+    }
+
+    // Market-aware freshness check
+    const lastPublish = getLastNavPublishDate();
+    const savedDate   = new Date(savedAt);
+
+    if (savedDate >= lastPublish) {
+      // Cache was saved after the last NAV publish date — still fresh
+      logger.info(`[Cache] Loaded ${data.funds.length} processed funds from disk (${ageHours}h old)`);
       return data;
     }
-    logger.info('[Cache] Processed data too old, will refresh');
+
+    // Cache was saved before the last NAV publish date — new data available
+    logger.info(`[Cache] Processed data (${ageHours}h old) pre-dates last NAV publish (${lastPublish.toISOString().slice(0,10)}) — will refresh`);
     return null;
   } catch {
     return null;
@@ -445,4 +528,8 @@ module.exports = {
   ensureCacheDir,
   fetchTERData,
   getTER,
+  isNavCacheFresh,
+  readNavFromDisk,
 };
+
+

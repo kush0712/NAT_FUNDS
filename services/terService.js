@@ -1,6 +1,5 @@
 /**
-
-const logger = require('../shared/logger'); * terService.js
+ * terService.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Downloads the official AMFI TER Excel file, extracts only the latest-date
  * rows in a single pass, saves the result atomically to ter-data.json, and
@@ -10,6 +9,8 @@ const logger = require('../shared/logger'); * terService.js
  *   https://www.amfiindia.com/api/populate-te-rdata-revised
  *     ?MF_ID=All&Month=MM-YYYY&strCat=-1&strType=-1&excel=true
  */
+
+const logger = require('../shared/logger');
 
 'use strict';
 

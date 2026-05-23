@@ -1,6 +1,5 @@
 /**
-
-const logger = require('../shared/logger'); * triService.js
+ * triService.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Fetches and caches real Total Return Index (TRI) time-series data for all
  * benchmark indices used by Indian mutual funds.
@@ -37,6 +36,8 @@ const logger = require('../shared/logger'); * triService.js
  * needed for correctness; it's only done here for readability in the cache file.
  * The raw TRI values are used directly in return calculations, which is correct.
  */
+
+const logger = require('../shared/logger');
 
 'use strict';
 

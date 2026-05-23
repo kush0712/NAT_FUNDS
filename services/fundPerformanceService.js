@@ -1,6 +1,5 @@
 /**
-
-const logger = require('../shared/logger'); * fundPerformanceService.js
+ * fundPerformanceService.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Fetches fund performance data from AMFI's Fund Performance API:
  *   POST https://www.amfiindia.com/gateway/pollingsebi/api/amfi/fundperformance
@@ -26,6 +25,8 @@ const logger = require('../shared/logger'); * fundPerformanceService.js
  * NOTE: AMFI does not return schemeCode in this API. Matching is done by
  *       normalising schemeName to handle plan/option suffixes.
  */
+
+const logger = require('../shared/logger');
 
 'use strict';
 
