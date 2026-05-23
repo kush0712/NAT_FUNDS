@@ -191,7 +191,12 @@ async function batchFetchNavs(schemeCodes, progressCb = null, delayMs = 50) {
   // Fetch uncached in parallel batches
   for (let i = 0; i < toFetch.length; i += CONCURRENCY) {
     const batch = toFetch.slice(i, i + CONCURRENCY);
-    const batchResults = await Promise.all(batch.map(code => fetchSchemeNav(code)));
+    const batchResults = await Promise.all(batch.map(async (code, idx) => {
+      if (idx > 0) {
+        await sleep(idx * 150); // Stagger starting requests by 150ms to respect rate-limiting
+      }
+      return fetchSchemeNav(code);
+    }));
     for (let j = 0; j < batch.length; j++) {
       const code = batch[j];
       const data = batchResults[j];
