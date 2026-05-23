@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: nat-funds
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/status
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        generateValue: false   # Render injects PORT automatically
+      - key: ADMIN_SECRET
+        sync: false            # Set this manually in Render dashboard
