@@ -170,7 +170,7 @@ async function batchFetchNavs(schemeCodes, progressCb = null, delayMs = 50) {
   const total = schemeCodes.length;
   let completed = 0;
   let cached = 0;
-  const CONCURRENCY = 25; // fetch 25 NAVs in parallel
+  const CONCURRENCY = parseInt(process.env.NAV_CONCURRENCY || '8', 10); // fetch NAVs in parallel (lower = safer on cloud)
 
   logger.info(`[Fetcher] Starting batch fetch for ${total} schemes (concurrency=${CONCURRENCY})...`);
 

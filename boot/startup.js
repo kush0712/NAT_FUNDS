@@ -318,7 +318,7 @@ async function boot() {
     (async () => {
       try {
         logger.info('[Boot:BG] Starting background metric refresh for all schemes...');
-        const bgSelected = selectTopFunds(rawFunds, 3000);
+        const bgSelected = selectTopFunds(rawFunds, 1500);
         const bgSchemeCodes = bgSelected.map(f => f.schemeCode);
         const bgNavMap = await batchFetchNavs(bgSchemeCodes, (completed, total, cached) => {
           if (completed % 200 === 0 || completed === total) {
@@ -382,7 +382,7 @@ async function boot() {
   logger.info(`[Boot] TER applied (${getTERCount()} schemes). AUM+Benchmarks+IR applied (${getAUMCount()} schemes).`);
   state.dataReady = true;
 
-  const selectedFunds = selectTopFunds(rawFunds, 3000);
+  const selectedFunds = selectTopFunds(rawFunds, 1500);
   logger.info(`[Boot] Selected ${selectedFunds.length} key schemes for upfront metrics processing.`);
 
   // ── Phase 3: Load TRI from disk cache; fetch missing in background ─────────
