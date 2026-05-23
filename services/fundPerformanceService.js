@@ -92,6 +92,12 @@ let _benchmarkCount   = 0;
 let _irCount          = 0;
 let _riskometerCount  = 0;
 
+// Caches for fuzzy name matching (cleared when indexes are rebuilt)
+let _aumCache         = {};
+let _benchmarkCache   = {};
+let _irCache          = {};
+let _riskometerCache  = {};
+
 // ─── Name Normalisation ──────────────────────────────────────────────────────
 
 /**
@@ -168,29 +174,50 @@ function fuzzyLookup(schemeName, index) {
   if (!schemeName) return undefined;
   const key = normaliseName(schemeName);
 
+  // Determine which cache to use
+  let cache = null;
+  if (index === _aumIndex) cache = _aumCache;
+  else if (index === _benchmarkIndex) cache = _benchmarkCache;
+  else if (index === _irIndex) cache = _irCache;
+
   // 1. Exact
   if (index[key] !== undefined) return index[key];
 
-  // 2. Substring containment
-  for (const [k, v] of Object.entries(index)) {
-    if (k.includes(key) || key.includes(k)) return v;
+  // 2. Try cache
+  if (cache && key in cache) {
+    return cache[key];
   }
 
-  // 3. Space-collapsed ("multi cap" ↔ "multicap")
+  // 3. Substring containment
+  for (const [k, v] of Object.entries(index)) {
+    if (k.includes(key) || key.includes(k)) {
+      if (cache) cache[key] = v;
+      return v;
+    }
+  }
+
+  // 4. Space-collapsed ("multi cap" ↔ "multicap")
   const keyNoSpace = collapseSpaces(key);
   for (const [k, v] of Object.entries(index)) {
-    if (collapseSpaces(k) === keyNoSpace) return v;
+    if (collapseSpaces(k) === keyNoSpace) {
+      if (cache) cache[key] = v;
+      return v;
+    }
   }
 
-  // 4. Token overlap ≥ 0.75
+  // 5. Token overlap ≥ 0.75
   let bestScore = 0;
   let bestVal;
   for (const [k, v] of Object.entries(index)) {
     const score = tokenOverlap(key, k);
     if (score > bestScore) { bestScore = score; bestVal = v; }
   }
-  if (bestScore >= 0.75) return bestVal;
+  if (bestScore >= 0.75) {
+    if (cache) cache[key] = bestVal;
+    return bestVal;
+  }
 
+  if (cache) cache[key] = undefined;
   return undefined;
 }
 
@@ -457,6 +484,11 @@ async function syncAUM() {
   _riskometerIndex = riskometerMap;
   _riskometerCount = riskometerCount;
 
+  // Clear fuzzy lookups caches
+  _aumCache        = {};
+  _irCache         = {};
+  _riskometerCache = {};
+
   return count;
 }
 
@@ -501,6 +533,7 @@ async function syncBenchmarks() {
 
   _benchmarkIndex = benchMap;
   _benchmarkCount = count;
+  _benchmarkCache = {};
 
   return count;
 }
@@ -531,6 +564,7 @@ async function initAUM() {
           _aumIndex = renormed;
           _aumDate  = json.date || 'unknown';
           _aumCount = json.count || Object.keys(json.data).length;
+          _aumCache = {}; // Reset cache on load
           logger.info(`[FundPerf] AUM loaded from cache: ${_aumCount} entries (${ageDays.toFixed(1)}d old, date: ${_aumDate})`);
           aumCacheValid = true;
         } else {
@@ -556,6 +590,7 @@ async function initAUM() {
         if (ageDays < IR_MAX_AGE_DAYS) {
           _irIndex = json.data;
           _irCount = json.count || Object.keys(json.data).length;
+          _irCache = {}; // Reset cache on load
           logger.info(`[FundPerf] IR loaded from cache: ${_irCount} entries (${ageDays.toFixed(1)}d old)`);
           irCacheValid = true;
         } else {
@@ -579,6 +614,7 @@ async function initAUM() {
         if (ageDays < RISKOMETER_MAX_AGE_DAYS) {
           _riskometerIndex = json.data;
           _riskometerCount = json.count || Object.keys(json.data).length;
+          _riskometerCache = {}; // Reset cache on load
           logger.info(`[FundPerf] Riskometer loaded from cache: ${_riskometerCount} entries (${ageDays.toFixed(1)}d old)`);
           riskometerCacheValid = true;
         } else {
@@ -616,6 +652,7 @@ async function initBenchmarks() {
         if (ageDays < BENCHMARK_MAX_AGE_DAYS) {
           _benchmarkIndex = json.data;
           _benchmarkCount = json.count || Object.keys(json.data).length;
+          _benchmarkCache = {}; // Reset cache on load
           logger.info(`[FundPerf] Benchmarks loaded from cache: ${_benchmarkCount} entries (${ageDays.toFixed(1)}d old)`);
           return;
         }
@@ -694,13 +731,22 @@ function getRiskometerByName(schemeName) {
   // 1. Exact match
   if (_riskometerIndex[key] !== undefined) return _riskometerIndex[key];
 
-  // 2. Substring containment only (strict — no fuzzy token overlap for riskometer
+  // 2. Try cache
+  if (key in _riskometerCache) {
+    return _riskometerCache[key];
+  }
+
+  // 3. Substring containment only (strict — no fuzzy token overlap for riskometer
   //    because the index only has equity names; fuzzy would match liquid/debt funds
   //    to equity entries sharing AMC name tokens, giving wrong "Very High" labels)
   for (const [k, v] of Object.entries(_riskometerIndex)) {
-    if (k.includes(key) || key.includes(k)) return v;
+    if (k.includes(key) || key.includes(k)) {
+      _riskometerCache[key] = v;
+      return v;
+    }
   }
 
+  _riskometerCache[key] = null;
   return null;
 }
 

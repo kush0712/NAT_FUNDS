@@ -46,6 +46,7 @@ const REQUIRED_HEADERS = [
 let _terIndex = {};   // normalized scheme name (string) → TER record
 let _terDate = null; // ISO date string of the TER data currently loaded
 let _terMissCount = 0; // funds where no TER match was found (for boot report)
+let _fuzzyCache = {}; // Cache for normalizedInput -> matched record (or null)
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -332,6 +333,7 @@ function loadTERIndex(records) {
   }
   _terIndex = newIndex;
   _terDate = records[0]?.date ?? null;
+  _fuzzyCache = {}; // Clear fuzzy matching cache
   logger.info(
     `[TER] In-memory index rebuilt: ${Object.keys(_terIndex).length} schemes (date: ${_terDate})`
   );
@@ -403,8 +405,15 @@ function getTERByName(schemeName) {
     return _terIndex[normalized];
   }
 
-  // 2. Try fuzzy match (length-filtered substring)
+  // 2. Try cache
+  if (normalized in _fuzzyCache) {
+    return _fuzzyCache[normalized];
+  }
+
+  // 3. Try fuzzy match (length-filtered substring)
   const match = findBestMatch(normalized);
+  _fuzzyCache[normalized] = match; // Cache the match (could be null)
+  
   if (match) {
     return match;
   }
