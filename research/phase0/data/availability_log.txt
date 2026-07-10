@@ -1,0 +1,28 @@
+BSE Data Availability Log
+============================================================
+Run date: 2026-07-10
+
+FINDING: BSE India public APIs are NOT programmatically accessible.
+  - api.bseindia.com: deprecated (returns 404 HTML)
+  - www.bseindia.com/Indices/IndexArchiveData.aspx/GetChartData:
+    requires live browser session (CSRF-protected, blocks bots)
+
+IMPLICATION FOR PAPER: The inaccessibility of BSE TRI data through
+any public API is itself a key finding — it directly motivates the
+open-proxy approach studied in this paper.
+
+FALLBACK: Yahoo Finance (yfinance) — provides BSE Price Index (Close).
+NOTE: Yahoo Finance gives PRICE index, NOT TRI (dividend-adjusted).
+This introduces a known dividend-reinvestment bias documented below.
+
+Per-Index Availability:
+------------------------------------------------------------
+  BSE SENSEX                ^BSESN          OK   3073 rows  [2014-01-01 → 2026-07-09]  TYPE: Price (not TRI)
+  BSE 100                   BSE-100.BO      OK   3069 rows  [2014-01-02 → 2026-07-09]  TYPE: Price (not TRI)
+  BSE 200                   BSE-200.BO      OK   3073 rows  [2014-01-01 → 2026-07-09]  TYPE: Price (not TRI)
+  BSE 500                   BSE-500.BO      OK   3069 rows  [2014-01-02 → 2026-07-09]  TYPE: Price (not TRI)
+  BSE Midcap                ^BSEMIDCAP      NOT AVAILABLE on Yahoo Finance
+  BSE Smallcap              ^BSESML         NOT AVAILABLE on Yahoo Finance
+  BSE BANKEX                BANKEX.BO       NOT AVAILABLE on Yahoo Finance
+  BSE Healthcare            ^BSEHLTH        NOT AVAILABLE on Yahoo Finance
+  BSE IT (Teck)             ^BSEIT          NOT AVAILABLE on Yahoo Finance

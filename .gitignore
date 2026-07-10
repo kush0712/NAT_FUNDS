@@ -9,7 +9,10 @@ mcp_config.json
 .env
 
 # Protect Research IP
-research/
+research/*.md
+research/*.tex
+research/phase0/outputs/
+research/phase1/outputs/
 
 # Optional: If you don't want to upload your large JSON databases to GitHub, uncomment these:
 # aum-data.json
