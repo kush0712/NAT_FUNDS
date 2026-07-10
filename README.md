@@ -16,7 +16,7 @@ NAT funds pulls live NAV data from AMFI, fetches real TRI (Total Return Index) b
 
 - **Live AMFI data** — Fetches the full NAV universe (~9,000+ schemes) from `amfiindia.com` on every boot. Parses the bulk NAV text file, categorises every fund, and has the entire universe available in memory within seconds.
 
-- **Real TRI benchmarks** — Fetches actual Total Return Index time-series from NSE's Nifty Indices API and BSE's daily AllIndices CSV. Covers 100+ benchmark indices. BSE benchmarks with insufficient history are stitched with a correlated Nifty proxy (correlation > 0.97 for broad indices).
+- **Real TRI benchmarks** — Fetches actual Total Return Index time-series from NSE's Nifty Indices API. BSE-benchmarked funds use the corresponding Nifty TRI series as a wholesale substitute (no BSE data is blended in). Empirically measured Pearson r of monthly returns over the ~17-month public BSE/Nifty overlap is ≈ 0.77–0.81 — a meaningful but imperfect proxy, explicitly documented as a limitation.
 
 - **Proper financial metrics** — Not scraped, actually computed:
   - CAGR (1Y / 3Y / 5Y / Since Inception) with binary search date alignment and 7-day gap tolerance
@@ -66,7 +66,7 @@ NAT funds pulls live NAV data from AMFI, fetches real TRI (Total Return Index) b
 │   ├── dataFetcher.js          # mfapi.in NAV history, TER Excel parsing, cache management
 │   ├── metricsCalculator.js    # All financial metric calculations (1,191 lines of pure math)
 │   ├── fundPerformanceService.js # AUM, benchmarks, IR, riskometer from AMFI Fund Perf API
-│   ├── triService.js           # TRI time-series from NSE + BSE, BSE/Nifty proxy stitching
+│   ├── triService.js           # TRI time-series from NSE; BSE benchmarks served via wholesale Nifty substitution (r≈0.78, documented limitation)
 │   └── riskFreeRate.js         # 91-day T-bill yield from CCIL India, weekly cached
 ├── routes/
 │   ├── api.js                  # REST API handlers (/api/funds, /api/fund/:code, /api/compare, etc.)
