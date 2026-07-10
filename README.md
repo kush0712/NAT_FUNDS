@@ -181,9 +181,16 @@ A few things I spent a lot of time getting right:
 
 ## 📚 Empirical Research
 
-The architectural "Data-Layer Alias" utilized by NAT_FUNDS to proxy unavailable BSE TRI data with Nifty TRI data was subjected to a rigorous 10-year empirical evaluation. The results have been synthesized into a formal academic paper: 
-**"The Index Substitution Problem: Open Proxies for Unavailable Benchmarks in Indian Fintech"** (Authored by Kushagra Jaiswal & Harleen Khanuja).
-* Findings prove that this substitution maintains mathematical integrity for risk metrics while correcting a systemic Alpha dividend bias in public data.
+The BSE benchmark substitution (Nifty TRI standing in for unavailable BSE TRI) has been subjected to a rigorous empirical evaluation. Key findings from the `research/` directory:
+
+- **Broad-market correlation:** Over 120 months (July 2016–June 2026), Pearson $r = 0.965$–$0.975$ between BSE Price indices (Yahoo Finance) and their Nifty TRI proxies — a lower bound on the true TRI-to-TRI correlation, since Price indices exclude dividends.
+- **Beta stability:** Across 13 large-cap BSE-benchmarked ETFs (SBI, ICICI, UTI, Nippon, Kotak, DSP, Mirae, Axis, BANDHAN, Aditya Birla, LIC MF), mean $\Delta\beta = +0.025$ (SD 0.014) — economically negligible for retail evaluation.
+- **Alpha accounting correction:** Mean $\Delta\alpha = -1.77\%$ (SD 0.53%), consistent with the Indian equity dividend yield (~1.5–2.0% p.a.) — the proxy avoids the Price-index Alpha inflation that SEBI's 2018 TRI mandate was designed to eliminate.
+- **Thematic failure mode:** Nifty CPSE substituted for BSE Select Business Groups yields $r = 0.656$ — a structural mismatch that must be excluded from automated mapping.
+
+Full scripts, raw CSVs, and output files are in [`research/`](research/). See [`research/README.md`](research/README.md) for the reproduction guide.
+
+> ⚠️ **Limitation:** Because BSE TRI data is unavailable, all comparisons above use BSE *Price* as a baseline, not BSE TRI. Results are a lower bound; the central question of Nifty-TRI-to-BSE-TRI fidelity requires commercial data to answer definitively.
 
 ---
 

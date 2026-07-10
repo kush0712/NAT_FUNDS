@@ -37,6 +37,7 @@ async function renderFundDetail(schemeCode) {
           </div>
           <p class="text-ink-muted text-sm leading-relaxed">
             ${fund.amc} · ${fund.type}: ${fund.subCategory} · ${fund.planType} Plan · ${fund.optionType}
+            ${fund.benchmarkName ? `<br><span class="inline-flex items-center gap-1 mt-1">Benchmark: <strong class="text-ink">${fund.benchmarkName}</strong> ${fund.benchmarkName.includes('BSE') ? `<span class="group relative inline-flex items-center cursor-help text-amber-600"><span class="material-symbols-outlined text-[14px]">info</span><span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded bg-ink px-3 py-2 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 font-normal z-50 whitespace-normal text-center shadow-lg">Note: Performance metrics for BSE-benchmarked funds are computed using the corresponding Nifty TRI proxy series due to lack of public BSE TRI data.</span></span>` : ''}</span>` : ''}
           </p>
         </div>
         <div class="flex gap-3">
