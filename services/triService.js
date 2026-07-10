@@ -556,9 +556,21 @@ function classifyBenchmark(benchName) {
 }
 
 /**
- * Stitch a short BSE series with a long Nifty proxy series.
- * Uses a scale factor derived from the earliest overlapping point.
+ * DEAD CODE — NOT CALLED ANYWHERE.
+ *
+ * Originally intended to stitch a short BSE series with a scaled Nifty history.
+ * The live sync path (Step 3 in syncTRI) instead performs a WHOLESALE SUBSTITUTION:
+ * it discards the BSE series entirely and uses the corresponding Nifty TRI series.
+ *
+ * Empirical measurement (dev-tools/verify-bse-nifty-correlation.js, July 2026):
+ *   Pearson r of monthly returns over the only publicly available
+ *   overlapping period (~17 months) is approx 0.77-0.79 across all pairs,
+ *   NOT the ">0.97" that was previously claimed in comments.
+ *
+ * If true stitching is ever implemented, this function is a starting point,
+ * but it must be validated against a longer overlap window first.
  */
+// eslint-disable-next-line no-unused-vars
 function stitchWithProxy(bseSeries, niftySeries) {
   if (!bseSeries || bseSeries.length === 0) return niftySeries || [];
   if (!niftySeries || niftySeries.length === 0) return bseSeries;
@@ -588,8 +600,12 @@ function stitchWithProxy(bseSeries, niftySeries) {
 
 /**
  * Fetch/refresh TRI data for a list of benchmark names.
- * Routes Nifty benchmarks to Nifty API, BSE benchmarks to BSE CSV.
- * BSE benchmarks with < 36 months are stitched with a Nifty proxy.
+ * Routes Nifty benchmarks to the Nifty API.
+ *
+ * BSE benchmarks are served by WHOLESALE SUBSTITUTION with the corresponding
+ * Nifty TRI series (via BSE_NIFTY_PROXY map). No BSE data is fetched or blended.
+ * Measured Pearson r of monthly returns over the ~17-month public overlap: approx 0.77-0.79.
+ * This limitation is explicitly documented and must be noted in any published analysis.
  *
  * @param {string[]} benchmarkNames  - e.g. ["Nifty 50 TRI", "BSE 100 TRI", ...]
  */
@@ -611,7 +627,7 @@ async function syncTRI(benchmarkNames) {
   // Single summary line (replaces one warn per fund)
   logger.info(
     `[TRI] Syncing TRI for ${unique.length} unique benchmarks ` +
-    `— ${niftyBenches.length} Nifty, ${bseBenches.length} BSE→proxy, ` +
+    `— ${niftyBenches.length} Nifty, ${bseBenches.length} BSE (wholesale Nifty substitute, r≈0.78), ` +
     `${foreignBenches.length} foreign (skip), ${compositeBenches.length} composite (skip)` +
     (unknownBenches.length ? `, ${unknownBenches.length} unknown` : '')
   );
@@ -663,13 +679,16 @@ async function syncTRI(benchmarkNames) {
     }
   }
 
-  // ─── Step 3: Fetch BSE benchmarks via Nifty proxy ──────────────────────────────
+  // ─── Step 3: BSE benchmarks — wholesale substitution with Nifty TRI series ───────
+  // NOTE: This is NOT a blend or stitch. The Nifty series replaces the BSE series
+  // entirely. Empirically measured Pearson r of monthly returns (~17-month overlap)
+  // is approx 0.77-0.79. See dev-tools/verify-bse-nifty-correlation.js.
   for (const benchName of bseBenches) {
     const bseCode = BSE_BENCHMARK_MAP[benchName];
     const niftyProxy = BSE_NIFTY_PROXY[bseCode];
 
     if (niftyProxy) {
-      logger.info(`[TRI] BSE "${bseCode}" — using Nifty proxy "${niftyProxy}" directly (faster, same data quality)`);
+      logger.info(`[TRI] BSE "${bseCode}" — wholesale substitute: Nifty series "${niftyProxy}" (r≈0.78 vs real BSE)`);
       await sleep(300);
       if (!niftyCache[niftyProxy]) {
         niftyCache[niftyProxy] = await fetchNiftyTRI(niftyProxy, startStr, endStr);
@@ -678,7 +697,7 @@ async function syncTRI(benchmarkNames) {
       if (series.length > 0) {
         _triStore[benchName] = series;
         synced++;
-        logger.info(`[TRI] BSE "${benchName}" via proxy: ${series.length} data points`);
+        logger.info(`[TRI] BSE "${benchName}" substituted with "${niftyProxy}": ${series.length} data points`);
       }
     } else {
       // No Nifty proxy — try BSE CSV (slow, likely to fail, last resort)

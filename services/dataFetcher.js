@@ -191,12 +191,7 @@ async function batchFetchNavs(schemeCodes, progressCb = null, delayMs = 50) {
   // Fetch uncached in parallel batches
   for (let i = 0; i < toFetch.length; i += CONCURRENCY) {
     const batch = toFetch.slice(i, i + CONCURRENCY);
-    const batchResults = await Promise.all(batch.map(async (code, idx) => {
-      if (idx > 0) {
-        await sleep(idx * 150); // Stagger starting requests by 150ms to respect rate-limiting
-      }
-      return fetchSchemeNav(code);
-    }));
+    const batchResults = await Promise.all(batch.map(code => fetchSchemeNav(code)));
     for (let j = 0; j < batch.length; j++) {
       const code = batch[j];
       const data = batchResults[j];
@@ -241,7 +236,12 @@ async function downloadTERForMonth(monthStr) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 120000); // 2 min timeout — large file
-    const resp = await fetch(url, { signal: controller.signal });
+    const resp = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'Accept-Encoding': 'identity'
+      }
+    });
     clearTimeout(timeout);
 
     if (!resp.ok) {
@@ -427,7 +427,7 @@ function getTER(fund) {
 
   // Return the TER for the matching plan type
   const isDirect = (fund.planType || '').toLowerCase() === 'direct' ||
-                   (fund.schemeName || '').toLowerCase().includes('direct');
+    (fund.schemeName || '').toLowerCase().includes('direct');
 
   const ter = isDirect ? entry.direct : entry.regular;
   return ter !== null && ter !== undefined ? parseFloat(ter.toFixed(2)) : null;
@@ -498,7 +498,7 @@ function loadProcessedData(maxAgeHours = null) {
     const raw = fs.readFileSync(dataPath, 'utf-8');
     const data = JSON.parse(raw);
     const savedAt = data.timestamp || 0;
-    const ageMs   = Date.now() - savedAt;
+    const ageMs = Date.now() - savedAt;
     const ageHours = (ageMs / 3600000).toFixed(1);
 
     // Absolute maximum — always re-fetch if cache is older than maxAgeHours
@@ -509,7 +509,7 @@ function loadProcessedData(maxAgeHours = null) {
 
     // Market-aware freshness check
     const lastPublish = getLastNavPublishDate();
-    const savedDate   = new Date(savedAt);
+    const savedDate = new Date(savedAt);
 
     if (savedDate >= lastPublish) {
       // Cache was saved after the last NAV publish date — still fresh
@@ -518,7 +518,7 @@ function loadProcessedData(maxAgeHours = null) {
     }
 
     // Cache was saved before the last NAV publish date — new data available
-    logger.info(`[Cache] Processed data (${ageHours}h old) pre-dates last NAV publish (${lastPublish.toISOString().slice(0,10)}) — will refresh`);
+    logger.info(`[Cache] Processed data (${ageHours}h old) pre-dates last NAV publish (${lastPublish.toISOString().slice(0, 10)}) — will refresh`);
     return null;
   } catch {
     return null;

@@ -50,12 +50,12 @@ async function renderExplore(category) {
     filtersEl.innerHTML = Object.entries(subCats).map(([sub, count]) => `
       <label class="flex items-center gap-3 group cursor-pointer">
         <input type="checkbox"
-               class="w-4 h-4 rounded border-outline text-primary focus:ring-primary subcategory-cb"
+               class="w-4 h-4 rounded border-hairline text-primary focus:ring-primary subcategory-cb"
                value="${sub}"
                ${state.selectedSubCategories.includes(sub) ? 'checked' : ''}
                onchange="toggleSubCategory('${sub}')">
-        <span class="text-sm font-medium text-on-surface group-hover:text-primary transition-colors">${sub}</span>
-        <span class="ml-auto text-[10px] bg-surface-container-high px-1.5 py-0.5 rounded tabular-nums">${count}</span>
+        <span class="text-[13px] text-ink group-hover:text-primary transition-colors">${sub}</span>
+        <span class="ml-auto text-[11px] text-ink-faint tabular-nums">${count}</span>
       </label>
     `).join('');
 
@@ -66,7 +66,7 @@ async function renderExplore(category) {
       const caps = ['Large Cap', 'Large & Mid Cap', 'Mid Cap', 'Small Cap', 'Multi Cap', 'Flexi Cap'];
       mcButtons.innerHTML = caps.map(cap => {
         const isActive = state.selectedMarketCaps.includes(cap);
-        return `<button onclick="toggleMarketCap('${cap}')" class="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide border transition-all ${isActive ? 'bg-primary text-white border-primary' : 'bg-surface border-outline-variant/50 text-on-surface-variant hover:border-primary/50'}">${cap}</button>`;
+        return `<button onclick="toggleMarketCap('${cap}')" class="px-3 py-1 rounded-full text-[11px] font-semibold border transition-all ${isActive ? 'bg-primary text-white border-primary' : 'bg-canvas-soft border-hairline text-ink-muted hover:border-primary hover:text-primary'}">${cap}</button>`;
       }).join('');
       mcSection.classList.remove('hidden');
     } else {
@@ -127,34 +127,34 @@ function renderFundTable(funds, pagination) {
     `;
   } else {
     tbody.innerHTML = funds.map((f, i) => `
-      <tr class="${i % 2 === 1 ? 'bg-indigo-50/30' : ''} hover:bg-indigo-50/80 relative transition-colors group">
+      <tr class="hover:bg-canvas-soft border-b border-hairline relative transition-colors group">
         <td class="px-4 py-4">
           <input type="checkbox"
-                 class="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary compare-cb"
+                 class="w-4 h-4 rounded border-hairline text-primary focus:ring-primary compare-cb"
                  data-code="${f.schemeCode}"
                  ${state.compareList.includes(f.schemeCode) ? 'checked' : ''}
                  onchange="toggleCompare('${f.schemeCode}')">
         </td>
         <td class="px-4 py-4">
           <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded ${getInitialBg(f.amc)} flex items-center justify-center font-bold text-[10px] flex-shrink-0">${getInitials(f.amc)}</div>
+            <div class="w-8 h-8 rounded-md ${getInitialBg(f.amc)} flex items-center justify-center font-bold text-[10px] flex-shrink-0">${getInitials(f.amc)}</div>
             <div class="min-w-0">
-              <a href="#/fund/${f.schemeCode}" class="text-sm font-bold text-primary group-hover:underline cursor-pointer flex items-center gap-2 truncate max-w-[300px]">
+              <a href="#/fund/${f.schemeCode}" class="text-sm font-semibold text-primary group-hover:underline cursor-pointer flex items-center gap-2 truncate max-w-[300px]" style="letter-spacing:-0.125px;">
                 <span class="truncate">${shortName(f.schemeName)}</span>
-                ${(f.cagr3y > 0 && f.sharpeRatio > 1.0 && f.planType === 'Direct' && f.aum > 500) ? `<span class="inline-flex items-center px-2 py-1 rounded-full text-[9px] font-bold bg-secondary-container text-on-secondary-container tooltip-trigger relative cursor-help shrink-0">★ PICK<span class="glass-tooltip" style="width:12rem; font-weight:normal; white-space:normal;">Suitable for beginners: >500Cr AUM, Direct plan, good risk-adjusted returns (Sharpe > 1.0).</span></span>` : ''}
+                ${(f.cagr3y > 0 && f.sharpeRatio > 1.0 && f.planType === 'Direct' && f.aum > 500) ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold bg-accent-teal/10 text-accent-teal tooltip-trigger relative cursor-help shrink-0">★ PICK<span class="glass-tooltip" style="width:12rem; font-weight:normal; white-space:normal;">Suitable for beginners: >500Cr AUM, Direct plan, good risk-adjusted returns (Sharpe > 1.0).</span></span>` : ''}
               </a>
-              <div class="text-[10px] text-on-surface-variant uppercase">${f.subCategory} • ${f.planType}</div>
+              <div class="text-[11px] text-ink-faint uppercase tracking-wide">${f.subCategory} · ${f.planType}</div>
             </div>
           </div>
         </td>
-        <td class="px-4 py-4 text-right font-label text-sm tabular-nums">${fmtNav(f.nav)}</td>
-        <td class="px-4 py-4 text-right text-sm tabular-nums">${fmtAUM(f)}</td>
-        <td class="px-4 py-4 text-right text-sm">${fmt(f.cagr1y)}</td>
-        <td class="px-4 py-4 text-right text-sm">${fmt(f.cagr3y)}</td>
-        <td class="px-4 py-4 text-right text-sm">${fmt(f.cagr5y)}</td>
-        <td class="px-4 py-4 text-right text-sm">${fmt(f.sharpeRatio, '', 2)}</td>
-        <td class="px-4 py-4 text-right text-sm">${fmt(f.standardDeviation)}</td>
-        <td class="px-4 py-4 text-right text-sm hidden xl:table-cell">${fmt(f.beta, '', 2)}</td>
+        <td class="px-4 py-4 text-right font-label text-sm tabular-nums text-ink">${fmtNav(f.nav)}</td>
+        <td class="px-4 py-4 text-right text-sm tabular-nums text-ink">${fmtAUM(f)}</td>
+        <td class="px-4 py-4 text-right text-sm text-ink">${fmt(f.cagr1y)}</td>
+        <td class="px-4 py-4 text-right text-sm text-ink">${fmt(f.cagr3y)}</td>
+        <td class="px-4 py-4 text-right text-sm text-ink">${fmt(f.cagr5y)}</td>
+        <td class="px-4 py-4 text-right text-sm text-ink">${fmt(f.sharpeRatio, '', 2)}</td>
+        <td class="px-4 py-4 text-right text-sm text-ink">${fmt(f.standardDeviation)}</td>
+        <td class="px-4 py-4 text-right text-sm text-ink hidden xl:table-cell">${fmt(f.beta, '', 2)}</td>
         <td class="px-4 py-4 text-right text-sm">${fmtScore(f.consistencyScore)}</td>
       </tr>
     `).join('');
@@ -163,19 +163,19 @@ function renderFundTable(funds, pagination) {
   // Pagination controls
   const pagEl = document.getElementById('table-pagination');
   pagEl.innerHTML = `
-    <span class="text-xs text-on-surface-variant font-medium">
+    <span class="text-[12px] text-ink-muted">
       Showing ${(pagination.page - 1) * pagination.limit + 1}–${Math.min(pagination.page * pagination.limit, pagination.totalCount)} of ${pagination.totalCount} funds
     </span>
-    <div class="flex gap-2">
+    <div class="flex gap-2 items-center">
       <button onclick="changePage(${pagination.page - 1})"
-              class="px-3 py-1.5 bg-surface-container-highest rounded text-[11px] font-bold text-on-surface hover:bg-surface-container-high transition-colors ${pagination.page <= 1 ? 'opacity-50 cursor-not-allowed' : ''}"
-              ${pagination.page <= 1 ? 'disabled' : ''}>PREVIOUS</button>
-      <span class="px-3 py-1.5 text-[11px] font-bold text-on-surface-variant tabular-nums">
+              class="px-4 py-1.5 bg-canvas border border-hairline rounded-md text-[11px] font-semibold text-ink-muted hover:text-ink hover:border-ink-faint transition-colors ${pagination.page <= 1 ? 'opacity-40 cursor-not-allowed' : ''}"
+              ${pagination.page <= 1 ? 'disabled' : ''}>Previous</button>
+      <span class="px-3 py-1.5 text-[11px] text-ink-muted tabular-nums">
         ${pagination.page} / ${pagination.totalPages}
       </span>
       <button onclick="changePage(${pagination.page + 1})"
-              class="px-3 py-1.5 bg-primary text-white rounded text-[11px] font-bold hover:opacity-90 transition-opacity ${pagination.page >= pagination.totalPages ? 'opacity-50 cursor-not-allowed' : ''}"
-              ${pagination.page >= pagination.totalPages ? 'disabled' : ''}>NEXT</button>
+              class="px-4 py-1.5 bg-primary text-white rounded-md text-[11px] font-semibold hover:bg-primary-active transition-colors ${pagination.page >= pagination.totalPages ? 'opacity-40 cursor-not-allowed' : ''}"
+              ${pagination.page >= pagination.totalPages ? 'disabled' : ''}>Next</button>
     </div>
   `;
 }

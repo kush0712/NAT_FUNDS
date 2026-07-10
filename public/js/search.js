@@ -26,9 +26,10 @@
           return;
         }
         searchResults.innerHTML = resp.results.map(f => `
-          <a href="#/fund/${f.schemeCode}" class="block px-4 py-3 hover:bg-surface-container-low transition-colors border-b border-outline-variant/10 last:border-b-0" onclick="document.getElementById('search-results').classList.add('hidden'); document.getElementById('global-search').value='';">
-            <div class="text-sm font-bold text-primary truncate">${shortName(f.schemeName)}</div>
-            <div class="text-[10px] text-on-surface-variant uppercase">${f.type}: ${f.subCategory} • ${f.planType} • ${f.optionType}</div>
+          <a href="#/fund/${f.schemeCode}" class="block px-4 py-3 hover:bg-canvas-soft transition-colors border-b border-hairline last:border-b-0" onclick="document.getElementById('search-results').classList.add('hidden'); document.getElementById('global-search').value='';"
+          >
+            <div class="text-sm font-semibold text-ink truncate" style="letter-spacing:-0.125px;">${shortName(f.schemeName)}</div>
+            <div class="text-[11px] text-ink-faint uppercase tracking-wide">${f.type}: ${f.subCategory} · ${f.planType} · ${f.optionType}</div>
           </a>
         `).join('');
         searchResults.classList.remove('hidden');

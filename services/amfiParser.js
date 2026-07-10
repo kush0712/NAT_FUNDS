@@ -149,7 +149,11 @@ function getInitials(amcName) {
  */
 async function parseAMFINav() {
   logger.info('[AMFI] Fetching NAV data...');
-  const response = await fetch(AMFI_NAV_URL);
+  const response = await fetch(AMFI_NAV_URL, {
+    headers: {
+      'Accept-Encoding': 'identity'
+    }
+  });
   const text = await response.text();
   const lines = text.split('\n');
 

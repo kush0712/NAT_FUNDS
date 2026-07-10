@@ -13,14 +13,14 @@
  * @param {number} decimals
  */
 function fmt(val, suffix = '%', decimals = 2) {
-  if (val === null || val === undefined) return '<span class="text-outline text-xs">N/A</span>';
-  if (val === 'Insufficient Data')       return '<span class="text-outline text-xs tracking-normal whitespace-nowrap">Insufficient Data</span>';
+  if (val === null || val === undefined) return '<span class="text-ink-faint text-xs">N/A</span>';
+  if (val === 'Insufficient Data')       return '<span class="text-ink-faint text-xs tracking-normal whitespace-nowrap">Insufficient Data</span>';
   if (typeof val === 'object' && val.avg !== undefined) val = val.avg;
   const num = parseFloat(val);
-  if (isNaN(num)) return '<span class="text-outline text-xs">N/A</span>';
+  if (isNaN(num)) return '<span class="text-ink-faint text-xs">N/A</span>';
   const formatted  = num.toFixed(decimals);
   const isPositive = num > 0;
-  const color  = suffix === '%' ? (isPositive ? 'text-secondary font-bold' : 'text-error font-bold') : 'text-on-surface';
+  const color  = suffix === '%' ? (isPositive ? 'text-primary font-semibold' : 'text-error font-semibold') : 'text-ink';
   const prefix = isPositive && suffix === '%' ? '+' : '';
   return `<span class="${color} tabular-nums">${prefix}${formatted}${suffix}</span>`;
 }
@@ -49,23 +49,23 @@ function getAumMissingReason(f) {
 function fmtAUM(f) {
   if (!f || f.aum === null || f.aum === undefined) {
     const reason = getAumMissingReason(f);
-    return `<span class="text-outline text-xs tooltip-trigger relative cursor-help">N/A
+    return `<span class="text-ink-faint text-xs tooltip-trigger relative cursor-help">N/A
       <span class="glass-tooltip whitespace-nowrap !font-normal">${reason}</span>
     </span>`;
   }
-  return `<span class="tabular-nums">₹ ${parseFloat(f.aum).toLocaleString('en-IN', { maximumFractionDigits: 0 })} Cr</span>`;
+  return `<span class="tabular-nums text-ink">₹ ${parseFloat(f.aum).toLocaleString('en-IN', { maximumFractionDigits: 0 })} Cr</span>`;
 }
 
 /** Format the Consistency Score /10 with colour coding. */
 function fmtScore(val) {
-  if (val === null || val === undefined) return '<span class="text-outline text-xs">N/A</span>';
-  if (typeof val !== 'number')           return '<span class="text-outline text-xs">N/A</span>';
+  if (val === null || val === undefined) return '<span class="text-ink-faint text-xs">N/A</span>';
+  if (typeof val !== 'number')           return '<span class="text-ink-faint text-xs">N/A</span>';
   const score = parseFloat(val);
   let colorClass;
   if (score >= 7.5)      colorClass = 'text-emerald-600 font-extrabold';
   else if (score >= 5.0) colorClass = 'text-amber-600 font-bold';
   else                   colorClass = 'text-rose-600 font-bold';
-  return `<span class="${colorClass} tabular-nums text-base">${score.toFixed(1)}<span class="text-[10px] text-outline font-normal">/10</span></span>`;
+  return `<span class="${colorClass} tabular-nums text-base">${score.toFixed(1)}<span class="text-[10px] text-ink-faint font-normal">/10</span></span>`;
 }
 
 // ─── Name / label helpers ─────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ function getInitialBg(name) {
 function tooltipHtml(key) {
   const text = METRIC_TOOLTIPS[key] || '';
   return `<span class="tooltip-trigger relative cursor-help">
-    <span class="material-symbols-outlined text-xs ml-0.5 align-middle text-outline">info</span>
+    <span class="material-symbols-outlined ml-0.5 align-middle text-ink-faint" style="font-size:12px;">info</span>
     <span class="glass-tooltip">${text}</span>
   </span>`;
 }
@@ -125,13 +125,13 @@ function tooltipHtml(key) {
 
 /** Returns a Tailwind colour pair for a SEBI riskometer label. */
 function getRiskBadgeColor(level) {
-  if (!level) return 'bg-surface-container-high text-on-surface-variant';
+  if (!level) return 'bg-canvas-soft text-ink-muted';
   const l = level.toLowerCase().trim();
   if (l === 'very high')       return 'bg-red-100 text-red-800';
-  if (l === 'high')            return 'bg-tertiary-container text-on-tertiary-container';
+  if (l === 'high')            return 'bg-orange-100 text-orange-900';
   if (l === 'moderately high') return 'bg-orange-100 text-orange-800';
   if (l === 'moderate')        return 'bg-amber-100 text-amber-800';
   if (l === 'low to moderate') return 'bg-lime-100 text-lime-800';
   if (l === 'low')             return 'bg-emerald-100 text-emerald-800';
-  return 'bg-surface-container-high text-on-surface-variant';
+  return 'bg-canvas-soft text-ink-muted';
 }

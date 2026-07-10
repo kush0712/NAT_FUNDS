@@ -26,15 +26,13 @@ function showView(viewId) {
 
   // Update active nav link
   document.querySelectorAll('.nav-link').forEach(a => {
-    a.classList.remove('text-indigo-900', 'border-b-2', 'border-indigo-900', 'font-semibold');
-    a.classList.add('text-slate-500');
+    a.classList.remove('active-nav');
   });
 
   const navMap = { home: 'nav-dashboard', explore: 'nav-explore', compare: 'nav-compare' };
   const activeNav = document.getElementById(navMap[viewId.replace('view-', '')]);
   if (activeNav) {
-    activeNav.classList.add('text-indigo-900', 'border-b-2', 'border-indigo-900', 'font-semibold');
-    activeNav.classList.remove('text-slate-500');
+    activeNav.classList.add('active-nav');
   }
 }
 
@@ -73,14 +71,14 @@ function renderSidebar() {
     const isActive = state.currentView === 'explore' && state.currentCategory === type;
     return `
       <a href="#/explore/${type}"
-         class="flex items-center gap-3 px-6 py-3 transition-transform duration-200 hover:translate-x-1 ${
+         class="flex items-center gap-3 px-4 py-2.5 rounded-md transition-all duration-150 relative ${
            isActive
-             ? 'bg-indigo-100 text-indigo-900 font-bold border-r-4 border-indigo-900'
-             : 'text-slate-600 hover:bg-slate-200'
+             ? 'bg-[rgba(0,117,222,0.07)] text-ink font-semibold sidebar-active'
+             : 'text-ink-muted hover:bg-canvas-soft hover:text-ink'
          }">
-        <span class="material-symbols-outlined text-xl" ${isActive ? "style=\"font-variation-settings: 'FILL' 1\"" : ''}>${meta.icon || 'folder'}</span>
-        <span class="text-xs tracking-widest uppercase font-label">${meta.label || type}</span>
-        <span class="ml-auto text-[10px] bg-surface-container-high px-1.5 py-0.5 rounded tabular-nums">${count}</span>
+        <span class="material-symbols-outlined" style="font-size:18px; ${isActive ? "font-variation-settings:'FILL' 1;color:var(--color-primary)" : 'color:var(--color-ink-faint)'}">${meta.icon || 'folder'}</span>
+        <span class="text-[13px] font-label">${meta.label || type}</span>
+        <span class="ml-auto text-[11px] text-ink-faint tabular-nums">${count}</span>
       </a>
     `;
   }).join('');

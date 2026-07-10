@@ -22,9 +22,9 @@ async function renderCompare() {
   if (codes.length < 2) {
     container.innerHTML = `
       <div class="lg:col-span-4 flex flex-col items-center justify-center py-20 text-center">
-        <span class="material-symbols-outlined text-5xl text-outline mb-4">compare_arrows</span>
-        <h3 class="font-headline text-xl font-bold text-on-surface mb-2">Select Funds to Compare</h3>
-        <p class="text-on-surface-variant text-sm max-w-md mb-6">Go to <a href="#/explore" class="text-primary font-bold hover:underline">Explore Funds</a> and select 2-4 funds using the checkboxes, then click Compare.</p>
+        <span class="material-symbols-outlined text-5xl text-ink-faint mb-4">compare_arrows</span>
+        <h3 class="font-headline font-bold text-ink mb-2" style="font-size:22px; letter-spacing:-0.25px;">Select Funds to Compare</h3>
+        <p class="text-ink-muted text-sm max-w-md mb-6">Go to <a href="#/explore" class="text-primary font-semibold hover:underline">Explore Funds</a> and select 2-4 funds using the checkboxes, then click Compare.</p>
       </div>
     `;
     warningEl.classList.add('hidden');
@@ -83,16 +83,15 @@ async function renderCompare() {
     // Labels column
     let labelsHtml = `<div class="hidden lg:flex flex-col pt-[208px] gap-0">`;
     for (const group of metrics) {
-      labelsHtml += `<div class="pt-6 pb-3 border-t border-outline-variant/15 lg:border-t-0 lg:h-12 lg:pt-0 lg:pb-2 lg:flex lg:items-end">
-        <span class="text-xs font-bold uppercase tracking-widest text-outline">${group.group}</span>
+      labelsHtml += `<div class="pt-6 pb-3 border-t border-hairline lg:border-t-0 lg:h-12 lg:pt-0 lg:pb-2 lg:flex lg:items-end">
+        <span class="eyebrow-label">${group.group}</span>
       </div>`;
       for (const item of group.items) {
-        // For amfiIR rows, use the informationRatio tooltip
         const tooltipKey = item.amfiPeriod ? 'informationRatio' : item.key;
         labelsHtml += `<div class="h-16 flex items-center">
           <div class="tooltip-trigger relative flex items-center gap-2 cursor-help">
-            <span class="text-sm font-semibold text-on-surface">${item.label}</span>
-            <span class="material-symbols-outlined text-base text-outline">info</span>
+            <span class="text-sm text-ink">${item.label}</span>
+            <span class="material-symbols-outlined text-ink-faint" style="font-size:15px;">info</span>
             <span class="glass-tooltip">${METRIC_TOOLTIPS[tooltipKey] || ''}</span>
           </div>
         </div>`;
@@ -104,8 +103,8 @@ async function renderCompare() {
     const fundCardsHtml = funds.map(f => {
       let valuesHtml = '';
       for (const group of metrics) {
-        valuesHtml += `<div class="pt-6 pb-2 border-t border-outline-variant/15 lg:border-t-0 lg:h-12 lg:pt-0 lg:pb-2 lg:flex lg:items-end">
-          <span class="lg:invisible text-xs font-bold uppercase tracking-widest text-outline">${group.group}</span>
+        valuesHtml += `<div class="pt-6 pb-2 border-t border-hairline lg:border-t-0 lg:h-12 lg:pt-0 lg:pb-2 lg:flex lg:items-end">
+          <span class="lg:invisible eyebrow-label">${group.group}</span>
         </div>`;
         for (const item of group.items) {
           // Handle amfiIR multi-period keys
@@ -125,14 +124,14 @@ async function renderCompare() {
           if (item.amfiPeriod) {
             // Information Ratio period cell — colour-coded
             function irColor(v) {
-              if (v === null || v === undefined) return 'text-outline';
+              if (val === null || val === undefined) return 'text-ink-faint';
               if (v >= 1.0) return 'text-emerald-600 font-extrabold';
-              if (v >= 0.5) return 'text-secondary font-bold';
+              if (v >= 0.5) return 'text-primary font-bold';
               if (v >= 0)   return 'text-amber-600 font-bold';
               return 'text-error font-bold';
             }
             if (val === null || val === undefined) {
-              displayHtml = `<span class="text-outline text-base">—</span>`;
+              displayHtml = `<span class="text-ink-faint text-base">—</span>`;
             } else {
               const num = parseFloat(val);
               displayHtml = `<span class="${irColor(num)} tabular-nums">${num.toFixed(2)}</span>`;
@@ -141,12 +140,12 @@ async function renderCompare() {
             // Bug 7 fix: unify 'Insufficient Data' and null/undefined — both display as '—'
             // 'Insufficient Data' (equity, no TRI) and null (debt, not applicable) mean
             // the same thing to the user: metric not available for this fund.
-            displayHtml = `<span class="text-outline text-base">—</span>`;
+            displayHtml = `<span class="text-ink-faint text-base">—</span>`;
           } else if (item.key === 'consistencyScore') {
             // Colour-coded score /10
             const score = parseFloat(val);
             const scoreColor = score >= 7.5 ? 'text-emerald-600' : score >= 5.0 ? 'text-amber-600' : 'text-rose-600';
-            displayHtml = `<span class="${scoreColor}">${score.toFixed(1)}<span class="text-xs text-outline font-normal">/10</span></span>`;
+            displayHtml = `<span class="${scoreColor}">${score.toFixed(1)}<span class="text-xs text-ink-faint font-normal">/10</span></span>`;
           } else if (item.key === 'maxDrawdown') {
             // Always red — it's a loss metric
             const num = parseFloat(val);
@@ -165,19 +164,19 @@ async function renderCompare() {
             // Bug 1 fix: neutral metrics (e.g. Standard Deviation) — higher is NOT better,
             // so never color green. Use neutral text-on-surface regardless of value sign.
             const num = parseFloat(val);
-            displayHtml = `<span class="text-on-surface">${num.toFixed(2)}${item.suffix}</span>`;
+            displayHtml = `<span class="text-ink">${num.toFixed(2)}${item.suffix}</span>`;
           } else {
             const num = parseFloat(val);
             const isPositive = num > 0;
             const colorClass = item.suffix === '%' || item.suffix === ''
-              ? (isPositive ? 'text-secondary' : 'text-rose-600')
-              : 'text-on-surface';
+              ? (isPositive ? 'text-primary' : 'text-rose-600')
+              : 'text-ink';
             const prefix = isPositive && item.suffix === '%' ? '+' : '';
             displayHtml = `<span class="${colorClass}">${prefix}${num.toFixed(2)}${item.suffix}</span>`;
           }
 
           valuesHtml += `<div class="h-16 flex flex-col justify-center">
-            <span class="lg:hidden text-[10px] uppercase font-bold text-outline mb-1">${item.label}</span>
+            <span class="lg:hidden eyebrow-label mb-1">${item.label}</span>
             <span class="text-2xl font-bold tabular-nums">
               ${displayHtml}
             </span>
@@ -187,15 +186,15 @@ async function renderCompare() {
       }
       
       return `
-        <div class="bg-surface-container-lowest rounded-xl p-6 shadow-sm ring-1 ring-outline-variant/10 hover:shadow-md transition-shadow">
+        <div class="bg-canvas border border-hairline rounded-xl p-6 hover:shadow-[var(--shadow-soft)] transition-shadow" style="box-shadow: var(--shadow-soft);">
           <div class="mb-6 lg:h-[160px] flex flex-col items-start">
-            <div class="w-12 h-12 rounded-lg ${getInitialBg(f.amc)} flex items-center justify-center mb-4 font-bold shrink-0">${getInitials(f.amc)}</div>
-            <h3 class="font-headline font-bold text-lg text-primary leading-tight line-clamp-3 shrink-0 w-full">
-              <a href="#/fund/${f.schemeCode}" class="hover:underline" title="${f.schemeName}">${shortName(f.schemeName)}</a>
+            <div class="w-11 h-11 rounded-lg ${getInitialBg(f.amc)} flex items-center justify-center mb-4 font-bold shrink-0">${getInitials(f.amc)}</div>
+            <h3 class="font-headline font-semibold text-base text-ink leading-tight line-clamp-3 shrink-0 w-full" style="letter-spacing:-0.125px;">
+              <a href="#/fund/${f.schemeCode}" class="hover:text-primary transition-colors" title="${f.schemeName}">${shortName(f.schemeName)}</a>
             </h3>
             <div class="mt-auto pt-2 shrink-0">
-              <span class="inline-block px-2 py-1 bg-primary-container text-on-primary-container text-[10px] font-bold rounded uppercase tracking-wide mb-1">${f.type}: ${f.subCategory}</span>
-              <span class="inline-block px-2 py-1 bg-surface-container-high text-on-surface-variant text-[10px] font-bold rounded uppercase tracking-wide ml-1 mb-1">${f.planType}</span>
+              <span class="inline-block px-2 py-0.5 bg-canvas-soft border border-hairline text-ink-muted text-[10px] font-semibold rounded uppercase tracking-wide mb-1">${f.type}: ${f.subCategory}</span>
+              <span class="inline-block px-2 py-0.5 bg-canvas-soft border border-hairline text-ink-muted text-[10px] font-semibold rounded uppercase tracking-wide ml-1 mb-1">${f.planType}</span>
             </div>
           </div>
           ${valuesHtml}
@@ -205,12 +204,12 @@ async function renderCompare() {
     
     // Empty card if less than 3
     const emptyCard = funds.length < 3 ? `
-      <a href="#/explore" class="bg-surface-container-low rounded-xl p-6 border-2 border-dashed border-outline-variant/30 flex flex-col items-center justify-center group cursor-pointer hover:bg-surface-container-high transition-all min-h-[400px]">
-        <div class="w-16 h-16 rounded-full bg-surface-container-highest flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-          <span class="material-symbols-outlined text-outline text-3xl">add</span>
+      <a href="#/explore" class="bg-canvas border-2 border-dashed border-hairline rounded-xl p-6 flex flex-col items-center justify-center group cursor-pointer hover:bg-canvas-soft transition-all min-h-[400px]">
+        <div class="w-16 h-16 rounded-full bg-canvas-soft flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+          <span class="material-symbols-outlined text-ink-faint text-3xl">add</span>
         </div>
-        <h3 class="font-headline font-bold text-outline">Add Another Fund</h3>
-        <p class="text-outline-variant text-xs mt-2 text-center px-4">Go to Explore to add more funds for comparison.</p>
+        <h3 class="font-headline font-semibold text-ink-muted" style="font-size:16px;">Add Another Fund</h3>
+        <p class="text-ink-faint text-xs mt-2 text-center px-4">Go to Explore to add more funds for comparison.</p>
       </a>
     ` : '';
     
