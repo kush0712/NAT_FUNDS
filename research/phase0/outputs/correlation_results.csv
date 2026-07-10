@@ -1,0 +1,8 @@
+bse_index,nifty_proxy,data_note,overlap_start,overlap_end,overlap_months,pearson_r,pearson_r2,pearson_p,pearson_ci_lo,pearson_ci_hi,spearman_rho,spearman_p,spearman_ci_lo,spearman_ci_hi,mean_bse_return,mean_nifty_return,std_bse_return,std_nifty_return,mean_abs_diff,max_abs_diff,notes
+BSE SENSEX,Nifty 50 TRI,yf_price_vs_nifty_tri,2016-07-31,2026-06-30,120,0.9647,0.9307,0.0,0.9398,0.9802,0.9513,0.0,0.9139,0.9711,0.9818,1.0888,4.6348,4.9069,0.8994,5.0521,
+BSE 100,Nifty 100 TRI,yf_price_vs_nifty_tri,2016-07-31,2026-06-30,120,0.973,0.9468,0.0,0.9546,0.9845,0.9641,0.0,0.938,0.9775,1.0372,1.1089,4.6895,4.9285,0.8155,4.2936,
+BSE 200,Nifty 200 TRI,yf_price_vs_nifty_tri,2016-07-31,2026-06-30,120,0.9734,0.9476,0.0,0.9562,0.9843,0.9642,0.0,0.9383,0.977,1.0852,1.1673,4.7679,5.0141,0.8387,4.2439,
+BSE 500,Nifty 500 TRI,yf_price_vs_nifty_tri,2016-07-31,2026-06-30,120,0.9746,0.9498,0.0,0.9583,0.985,0.9639,0.0,0.9386,0.9767,1.1119,1.1975,4.8645,5.065,0.8374,3.8893,
+BSE Power TRI,Nifty Energy TRI,actual_bse_tri_17mo,2025-02-28,2026-06-30,17,0.8958,0.8025,1e-06,0.6652,0.9645,0.7647,0.00035,0.368,0.9525,1.5461,1.4381,7.8695,5.9352,3.3164,6.5189,
+BSE Quality TRI,Nifty 200 Quality 30 TRI,different_index_composition,2016-07-31,2026-06-30,120,0.8892,0.7908,0.0,0.8326,0.9267,0.838,0.0,0.7554,0.8958,1.1673,1.0775,5.0141,4.2984,1.7114,9.8771,
+BSE Select Business Groups Index TRI,Nifty CPSE TRI,different_index_composition,2016-07-31,2026-06-30,120,0.656,0.4303,0.0,0.5601,0.7354,0.674,0.0,0.5628,0.7575,1.1975,1.537,5.065,6.6594,3.9609,16.1582,

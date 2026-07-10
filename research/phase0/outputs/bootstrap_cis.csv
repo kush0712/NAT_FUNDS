@@ -1,0 +1,8 @@
+bse_index,nifty_proxy,data_note,overlap_months,pearson_r,pearson_ci_lo,pearson_ci_hi,spearman_rho,spearman_ci_lo,spearman_ci_hi
+BSE SENSEX,Nifty 50 TRI,yf_price_vs_nifty_tri,120,0.9647,0.9398,0.9802,0.9513,0.9139,0.9711
+BSE 100,Nifty 100 TRI,yf_price_vs_nifty_tri,120,0.973,0.9546,0.9845,0.9641,0.938,0.9775
+BSE 200,Nifty 200 TRI,yf_price_vs_nifty_tri,120,0.9734,0.9562,0.9843,0.9642,0.9383,0.977
+BSE 500,Nifty 500 TRI,yf_price_vs_nifty_tri,120,0.9746,0.9583,0.985,0.9639,0.9386,0.9767
+BSE Power TRI,Nifty Energy TRI,actual_bse_tri_17mo,17,0.8958,0.6652,0.9645,0.7647,0.368,0.9525
+BSE Quality TRI,Nifty 200 Quality 30 TRI,different_index_composition,120,0.8892,0.8326,0.9267,0.838,0.7554,0.8958
+BSE Select Business Groups Index TRI,Nifty CPSE TRI,different_index_composition,120,0.656,0.5601,0.7354,0.674,0.5628,0.7575

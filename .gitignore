@@ -8,11 +8,11 @@ stitch-skills/
 mcp_config.json
 .env
 
-# Protect Research IP
-research/*.md
-research/*.tex
-research/phase0/outputs/
-research/phase1/outputs/
+# Research working notes (not for publication)
+research/paper_draft.md
+research/paper_v2_engineering.md
+research/phase0_findings.md
+research/phase1_findings.md
 
 # Optional: If you don't want to upload your large JSON databases to GitHub, uncomment these:
 # aum-data.json

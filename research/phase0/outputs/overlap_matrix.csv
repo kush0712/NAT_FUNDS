@@ -1,0 +1,8 @@
+bse_index,nifty_proxy,data_note,overlap_start,overlap_end,overlap_months,notes
+BSE SENSEX,Nifty 50 TRI,yf_price_vs_nifty_tri,2016-07-31,2026-06-30,120,
+BSE 100,Nifty 100 TRI,yf_price_vs_nifty_tri,2016-07-31,2026-06-30,120,
+BSE 200,Nifty 200 TRI,yf_price_vs_nifty_tri,2016-07-31,2026-06-30,120,
+BSE 500,Nifty 500 TRI,yf_price_vs_nifty_tri,2016-07-31,2026-06-30,120,
+BSE Power TRI,Nifty Energy TRI,actual_bse_tri_17mo,2025-02-28,2026-06-30,17,
+BSE Quality TRI,Nifty 200 Quality 30 TRI,different_index_composition,2016-07-31,2026-06-30,120,
+BSE Select Business Groups Index TRI,Nifty CPSE TRI,different_index_composition,2016-07-31,2026-06-30,120,
